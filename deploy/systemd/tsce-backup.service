@@ -1,0 +1,14 @@
+[Unit]
+Description=TSCE — nightly backup of the database and private uploads
+
+[Service]
+Type=oneshot
+User=tsce
+Group=tsce
+ExecStart=/srv/tsce/deploy/scripts/backup.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# SQLite in WAL mode needs write access to its -shm file even to read a backup.
+ReadWritePaths=/var/backups/tsce /var/lib/tsce

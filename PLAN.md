@@ -136,7 +136,7 @@ Permissions: `IsApplicant`, `IsStudent`, `IsStaff` (staff+admin), `IsAdmin`. Stu
 - [x] All models + migrations + Django admin registrations (20 models)
 - [x] `seed_school` command: SiteSettings from flyer + 11 programmes / 85 modules + October cohort (idempotent; `--update` resets programmes to the flyer)
 - [x] Model tests: sequences, singleton, grading, derived module progress, constraints, seed behaviour
-- [ ] ~~`seed_demo`~~ moved to Phase 5b, so demo data is created through the real services instead of duplicating their logic
+- [ ] ~~`seed_demo`~~ moved to Phase 5b (since skipped)
 
 **Phase 2 — Auth**
 - [x] `auth/login` (CSRF-protected, rate-limited 10/min per IP, "keep me signed in"), `auth/logout`, `auth/me`, `auth/change-password`
@@ -176,8 +176,8 @@ Permissions: `IsApplicant`, `IsStudent`, `IsStaff` (staff+admin), `IsAdmin`. Stu
 - [x] Staff pages not yet on the API (students, programmes, attendance, assessments, certificates, announcements, reports) are marked "soon" and show "Coming soon" instead of demo data
 - [x] Tests: 84 unit tests; browser suite `staff` (28 checks)
 
-**Phase 5b — Demo/staging data**
-- [ ] `seed_demo` command (staging only): builds demo applicants, payments and students by calling the real services
+**Phase 5b — Demo/staging data** *(skipped, optional, 1 Oct 2026)*
+- Not needed for launch: production starts empty, and the browser suites set up their own data. For a demo or training copy, run a staging server with the payment simulator and register a few test accounts. Revisit only if a permanent demo server full of sample records is ever wanted.
 
 **Phase 3b — Accounts, email verification & two-step admissions** (rework of Phases 3–4 for the revised flow)
 - [x] Register as Student (self) or Parent → verification email (signed link, 48 h) → verify signs you in once; login refused until verified (a new link is sent); resend; nothing reveals whether an email is registered
@@ -195,10 +195,13 @@ Permissions: `IsApplicant`, `IsStudent`, `IsStaff` (staff+admin), `IsAdmin`. Stu
 - [ ] Student portal shows an "almost ready" placeholder until Phase 7. Decide what paid students see at launch (at minimum: admission status + receipt).
 
 **Phase 6 — Deploy (VPS)**
-- [ ] nginx + gunicorn + systemd, HTTPS (Let's Encrypt), `collectstatic`, media dir permissions
-- [ ] cron: `reconcile_payments` every 5 minutes
-- [ ] Production settings (DEBUG off, secure cookies, HSTS, allowed hosts), daily SQLite + media backup (cron, `sqlite3 .backup`)
-- [ ] Zainpay sandbox end-to-end test → switch to live keys
+- [x] Deployment kit in `deploy/` (guide: `deploy/README.md`): nginx site (frontend files + `/api` and `/admin` proxy, private uploads never served, dotfiles denied), gunicorn on a unix socket under hardened systemd, `bootstrap.sh` (one-time server setup incl. firewall + Let's Encrypt), `update.sh` (backup → pull → migrate → restart → health check), `tsce-manage` helper
+- [x] systemd timers: `reconcile_payments` every 5 minutes; nightly SQLite (`.backup` + integrity check) + private-uploads backup, 30 days kept
+- [x] `manage.py preflight [--send-test-email]`: go-live checklist (secrets, HTTPS/hosts/CSRF, migrations, school data, admin, Zainpay keys + webhook URL, email, private-file safety, static files)
+- [x] `manage.py` picks production settings from `backend/.env` on the server
+- [ ] **Run on the VPS** — needs: server access, domain + DNS, Zainpay sandbox keys, Gmail app password
+- [ ] Zainpay sandbox end-to-end test (guide §4) → clear test data → live keys
+- [ ] Off-server copy of `/var/backups/tsce` (provider snapshots, rclone, or scp)
 
 ### After launch
 

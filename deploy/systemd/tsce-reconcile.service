@@ -1,0 +1,14 @@
+[Unit]
+Description=TSCE — confirm Zainpay payments whose callback/webhook was missed
+
+[Service]
+Type=oneshot
+User=tsce
+Group=tsce
+WorkingDirectory=/srv/tsce/backend
+ExecStart=/srv/tsce/backend/.venv/bin/python manage.py reconcile_payments
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/tsce

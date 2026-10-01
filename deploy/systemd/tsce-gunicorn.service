@@ -1,0 +1,24 @@
+[Unit]
+Description=TSCE portal (Django on gunicorn)
+After=network.target
+
+[Service]
+User=tsce
+Group=tsce
+WorkingDirectory=/srv/tsce/backend
+ExecStart=/srv/tsce/backend/.venv/bin/gunicorn -c /srv/tsce/deploy/gunicorn.conf.py config.wsgi
+ExecReload=/bin/kill -s HUP $MAINPID
+RuntimeDirectory=tsce
+RuntimeDirectoryMode=0750
+Restart=on-failure
+RestartSec=3
+
+# Hardening: the app may only write its data folder.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/tsce
+
+[Install]
+WantedBy=multi-user.target
