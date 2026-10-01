@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Apply — TSCE</title>
+    <meta name="description" content="Apply online for a TSCE programme.">
+    <meta name="theme-color" content="#0B1D55">
+    <link rel="icon" href="../assets/logo/favicon.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+</head>
+<body data-root="../" data-page="application">
+<a class="skip-link" href="#main">Skip to content</a>
+<div id="site-header"></div>
+<main id="main">
+<section class="page-hero" style="padding:40px 0 32px"><div class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="../index.html">Home</a><i class="fa-solid fa-chevron-right"></i><a href="admissions.html">Admissions</a><i class="fa-solid fa-chevron-right"></i><span>Application</span></nav>
+    <div class="flex between flex-wrap"><div><h1 style="font-size:clamp(1.7rem,3vw,2.4rem);margin-bottom:6px">Online application</h1><p class="muted mb-0">October 2026 Cohort · takes about 5 minutes · your progress is saved automatically</p></div>
+    <button type="button" class="btn btn-soft" id="autofill"><i class="fa-solid fa-wand-magic-sparkles"></i> Autofill demo applicant</button></div>
+</div></section>
+<section class="section" style="padding-top:36px"><div class="container" id="wizardRoot">
+    <div class="wizard-wrap">
+        <aside class="wizard-steps" aria-label="Application progress">
+            <ol>
+                <li class="wstep active"><span class="dot">1</span><div><strong>Personal</strong><small>Your details</small></div></li>
+                <li class="wstep"><span class="dot">2</span><div><strong>Education</strong><small>Background</small></div></li>
+                <li class="wstep"><span class="dot">3</span><div><strong>Programme</strong><small>Course &amp; schedule</small></div></li>
+                <li class="wstep"><span class="dot">4</span><div><strong>Review</strong><small>Fees &amp; discounts</small></div></li>
+                <li class="wstep"><span class="dot">5</span><div><strong>Payment</strong><small>Zainpay</small></div></li>
+            </ol>
+            <div class="wizard-progress"><div class="progress sm"><span id="wProgress" style="width:20%"></span></div><p class="hint mt-1 mb-0" id="draftNote">Draft saves automatically</p></div>
+        </aside>
+        <form class="wizard-card" id="appForm" novalidate>
+            <div class="wizard-head"><div><h2 id="wTitle">Personal information</h2><p id="wSub"></p></div><span class="badge badge-primary no-dot" id="wStepNo">Step 1 of 5</span></div>
+            <div class="wizard-body">
+                <div class="wpanel active" data-title="Personal information" data-sub="Tell us about yourself. Fields marked * are required.">
+                    <div class="form-grid cols-3">
+                        <div class="field"><label for="a_first">First name <span class="req">*</span></label><input id="a_first" name="firstName" class="input" required autocomplete="given-name"></div>
+                        <div class="field"><label for="a_middle">Middle name</label><input id="a_middle" name="middleName" class="input" autocomplete="additional-name"></div>
+                        <div class="field"><label for="a_last">Last name <span class="req">*</span></label><input id="a_last" name="lastName" class="input" required autocomplete="family-name"></div>
+                        <div class="field"><label for="a_gender">Gender <span class="req">*</span></label><select id="a_gender" name="gender" class="select" required><option value="">Select</option><option>Female</option><option>Male</option></select></div>
+                        <div class="field"><label for="a_dob">Date of birth <span class="req">*</span></label><input id="a_dob" name="dob" type="date" class="input" required max="2012-12-31" min="1950-01-01"></div>
+                        <div class="field"><label for="a_phone">Phone <span class="req">*</span></label><input id="a_phone" name="phone" class="input" data-type="phone" required autocomplete="tel" placeholder="0803 123 4567"></div>
+                        <div class="field" style="grid-column:span 2"><label for="a_email">Email address <span class="req">*</span></label><input id="a_email" name="email" type="email" class="input" required autocomplete="email" placeholder="you@example.com"><span class="hint">Your receipt and portal login will be sent here.</span></div>
+                        <div class="field"><label for="a_state">State <span class="req">*</span></label><select id="a_state" name="state" class="select" required></select></div>
+                        <div class="field" style="grid-column:span 2"><label for="a_address">Residential address <span class="req">*</span></label><input id="a_address" name="address" class="input" required autocomplete="street-address"></div>
+                        <div class="field"><label for="a_lga">LGA <span class="req">*</span></label><input id="a_lga" name="lga" class="input" list="lgaList" required><datalist id="lgaList"></datalist></div>
+                    </div>
+                </div>
+                <div class="wpanel" data-title="Educational background" data-sub="Your highest qualification and WAEC/NECO status.">
+                    <div class="form-grid">
+                        <div class="field"><label for="a_qual">Highest qualification <span class="req">*</span></label><select id="a_qual" name="qualification" class="select" required><option value="">Select</option><option>SSCE</option><option>OND</option><option>NCE</option><option>HND</option><option>B.Sc</option><option>B.Eng</option><option>B.A.</option><option>M.Sc / MBA</option><option>Other</option></select></div>
+                        <div class="field"><label for="a_grad">Graduation year <span class="req">*</span></label><input id="a_grad" name="gradYear" type="number" min="1970" max="2026" class="input" required placeholder="e.g. 2023"></div>
+                        <div class="field span-2"><label for="a_inst">Institution <span class="req">*</span></label><input id="a_inst" name="institution" class="input" required placeholder="e.g. Ahmadu Bello University, Zaria"></div>
+                        <div class="field"><label for="a_waec">WAEC / NECO status <span class="req">*</span></label><select id="a_waec" name="waecStatus" class="select" required><option value="">Select</option><option>Available</option><option>Awaiting Result</option><option>Not Applicable</option></select></div>
+                        <div class="field waec-dep hidden"><label for="a_waecYear">Exam year <span class="req">*</span></label><input id="a_waecYear" name="waecYear" type="number" min="1990" max="2026" class="input" data-req="1" placeholder="e.g. 2022"></div>
+                        <div class="field waec-dep hidden"><label for="a_numAs">Number of A's <span class="req">*</span></label><input id="a_numAs" name="numAs" type="number" min="0" max="9" class="input" data-req="1" placeholder="0–9"></div>
+                        <div class="field span-2 waec-dep hidden"><label>Upload result (placeholder)</label><div class="upload-box" id="uploadBox" tabindex="0" role="button" aria-label="Upload WAEC/NECO result"><i class="fa-solid fa-cloud-arrow-up"></i><div><b>Click to upload</b> or drag &amp; drop</div><div class="hint">PDF, JPG or PNG · max 5MB (simulated — file stays on your device)</div></div><input type="file" id="a_file" accept=".pdf,.jpg,.jpeg,.png" hidden><input type="hidden" id="a_resultFile" name="resultFile"></div>
+                        <div class="span-2" id="excHint"></div>
+                    </div>
+                </div>
+                <div class="wpanel" data-title="Programme selection" data-sub="Choose your programme, preferred schedule and intake.">
+                    <div class="field mb-2"><label>Programme <span class="req">*</span></label><input type="hidden" id="a_programme"><div class="prog-select" id="progPicker"></div></div>
+                    <div class="form-grid mt-2">
+                        <div class="field"><label for="a_schedule">Preferred schedule <span class="req">*</span></label><select id="a_schedule" name="schedule" class="select" required></select></div>
+                        <div class="field"><label for="a_intake">Intake <span class="req">*</span></label><select id="a_intake" name="intake" class="select" required></select></div>
+                        <div class="span-2" id="progFee"></div>
+                    </div>
+                </div>
+                <div class="wpanel" data-title="Review, fees &amp; discounts" data-sub="Check your details, see available discounts and create your portal password.">
+                    <div class="form-section-title">Available discounts</div>
+                    <div class="stack" id="discountList"></div>
+                    <div class="form-section-title mt-3">Fee calculation</div>
+                    <div id="feeCalc"></div>
+                    <div class="form-section-title mt-3">Your application <span class="flex" style="margin-left:auto;gap:6px"><button type="button" class="link-btn small" data-goto="0">Edit personal</button><button type="button" class="link-btn small" data-goto="1">Edit education</button><button type="button" class="link-btn small" data-goto="2">Edit programme</button></span></div>
+                    <div class="review-grid" id="reviewGrid"></div>
+                    <div class="form-section-title mt-3">Student portal account</div>
+                    <div class="form-grid">
+                        <div class="field"><label for="a_password">Create password <span class="req">*</span></label><input id="a_password" name="password" type="password" class="input" required minlength="6" autocomplete="new-password"><div class="pw-meter" aria-hidden="true"><span></span><span></span><span></span><span></span></div></div>
+                        <div class="field"><label for="a_password2">Confirm password <span class="req">*</span></label><input id="a_password2" name="password2" type="password" class="input" required data-match="a_password" autocomplete="new-password"></div>
+                        <div class="field span-2"><label class="check"><input type="checkbox" id="a_declare" name="declare" required> I confirm the information provided is accurate and I agree to the TSCE admission terms.</label></div>
+                    </div>
+                </div>
+            </div>
+            <div class="wizard-foot">
+                <button type="button" class="btn btn-ghost" id="prevBtn"><i class="fa-solid fa-arrow-left"></i> Back</button>
+                <button type="button" class="btn btn-primary" id="nextBtn">Continue <i class="fa-solid fa-arrow-right"></i></button>
+                <button type="submit" class="btn btn-grad hidden" id="submitBtn"><i class="fa-solid fa-lock"></i> Proceed to Payment · <span id="payBtnAmt"></span></button>
+            </div>
+        </form>
+    </div>
+</div></section>
+</main>
+<div id="site-footer"></div>
+
+<script src="../js/data.js"></script>
+<script src="../js/storage.js"></script>
+<script src="../js/ui.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/programmes.js"></script>
+<script src="../js/payments.js"></script>
+<script src="../js/applications.js"></script>
+<script src="../js/notifications.js"></script>
+<script src="../js/students.js"></script>
+<script src="../js/dashboard.js"></script>
+<script src="../js/reports.js"></script>
+<script src="../js/app.js"></script>
+</body>
+</html>

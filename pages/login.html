@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign in — TSCE</title>
+    <meta name="description" content="Sign in to the TSCE student or staff portal.">
+    <meta name="theme-color" content="#0B1D55">
+    <link rel="icon" href="../assets/logo/favicon.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+</head>
+<body data-root="../" data-page="login" data-nodemo>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+<div class="auth-page">
+    <aside class="auth-side">
+        <div data-brand></div>
+        <div><h2>One platform for your entire TSCE journey.</h2><p>Apply, pay, learn, track your progress and get certified — or manage admissions, students and finance from one secure portal.</p>
+            <div class="auth-points"><div><i class="fa-solid fa-chart-line"></i>Live progress, attendance &amp; results</div><div><i class="fa-solid fa-shield-halved"></i>Secure payments powered by Zainpay</div><div><i class="fa-solid fa-certificate"></i>Verifiable digital certificates</div></div></div>
+        <p class="small" style="margin:0;color:#8FA2D8">© 2026 Trust Skills Center of Excellence · Zaria</p>
+    </aside>
+    <div class="auth-main"><div class="auth-box">
+        <a href="../index.html" class="small muted"><i class="fa-solid fa-arrow-left"></i> Back to website</a>
+        <div class="mt-3" id="alreadyIn"></div>
+        <span class="badge badge-gold mb-2">Demo mode</span>
+        <h1 id="loginTitle">Student Portal</h1><p class="muted" id="loginSub"></p>
+        <div class="role-switch" role="group" aria-label="Choose portal"><button type="button" data-role="student" aria-pressed="true"><i class="fa-solid fa-user-graduate"></i> Student</button><button type="button" data-role="staff" aria-pressed="false"><i class="fa-solid fa-briefcase"></i> Staff</button></div>
+        <div id="loginError"></div>
+        <form id="loginForm" novalidate>
+            <div class="field mb-2"><label for="loginEmail">Email address</label><div class="input-icon"><i class="fa-regular fa-envelope"></i><input id="loginEmail" type="email" class="input" required autocomplete="username"></div></div>
+            <div class="field mb-2"><label for="loginPassword">Password</label><div class="input-affix"><input id="loginPassword" type="password" class="input" required autocomplete="current-password"><button type="button" class="affix-btn" id="togglePw" aria-label="Show password"><i class="fa-solid fa-eye"></i></button></div></div>
+            <div class="flex between mb-3"><label class="check"><input type="checkbox" checked> Keep me signed in</label><button type="button" class="link-btn small" id="forgotPw">Forgot password?</button></div>
+            <button type="submit" class="btn btn-primary btn-lg btn-block">Sign in <i class="fa-solid fa-arrow-right"></i></button>
+        </form>
+        <div class="demo-login"><h5><i class="fa-solid fa-flask"></i> Demo accounts — one click</h5>
+            <div class="demo-acc"><div><strong>Amina Yusuf · Student</strong><span>amina.yusuf@example.com / student123</span></div><button class="btn btn-sm btn-primary" data-demo="student">Enter Demo</button></div>
+            <div class="demo-acc"><div><strong>Muhammad Ibrahim · Student</strong><span>muhammad.ibrahim@example.com / student123</span></div><button class="btn btn-sm btn-soft" data-demo="student2">Enter Demo</button></div>
+            <div class="demo-acc"><div><strong>Dr. Abubakar Sadiq · Admin</strong><span>admin@tsce.edu.ng / admin123</span></div><button class="btn btn-sm btn-dark" data-demo="staff">Enter Demo</button></div>
+            <div class="demo-acc"><div><strong>Hajiya Rabi Isa · Staff</strong><span>admissions@tsce.edu.ng / staff123</span></div><button class="btn btn-sm btn-soft" data-demo="officer">Enter Demo</button></div>
+        </div>
+        <p class="small muted mt-3">New to TSCE? <a href="application.html">Apply for a programme</a></p>
+    </div></div>
+</div>
+</main>
+
+
+<script src="../js/data.js"></script>
+<script src="../js/storage.js"></script>
+<script src="../js/ui.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/programmes.js"></script>
+<script src="../js/payments.js"></script>
+<script src="../js/applications.js"></script>
+<script src="../js/notifications.js"></script>
+<script src="../js/students.js"></script>
+<script src="../js/dashboard.js"></script>
+<script src="../js/reports.js"></script>
+<script src="../js/app.js"></script>
+</body>
+</html>
