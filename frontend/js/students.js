@@ -41,7 +41,7 @@ const Students = (() => {
 
     function certificateHTML(s, { locked = false } = {}) {
         const p = Programmes.get(s.programmeId);
-        const verifyUrl = `${TSCE_FLYER.website}/verify`;
+        const verifyUrl = `${TSCE_FLYER.website}/pages/verify.html`;
         return `<div class="certificate ${locked ? "locked" : ""}" role="img" aria-label="Certificate of completion for ${UI.esc(fullName(s))}">
             ${locked ? `<div class="cert-watermark">PREVIEW</div>` : ""}
             <div class="cert-inner">

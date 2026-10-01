@@ -19,7 +19,7 @@ const TSCE_FLYER = Object.freeze({
     earlyBirdDeadline: "2026-10-01",    // payment BEFORE 1 October 2026
     discounts: { earlybird: 15, excellence: 50, scholarshipMax: 40 },
     phones: ["0803 452 2501", "0904 439 2228", "0803 386 0784"],
-    website: "www.tsce.edu.ng",
+    website: "www.tsce.com.ng",
     email: "info@tsce.edu.ng",
     address: "KM8, Sokoto Road, ITN Opposite Aviation Quarters Zangon Shanu Zaria, P.O. Box 984 Zaria, Nigeria",
     city: "Zaria, Kaduna State, Nigeria",

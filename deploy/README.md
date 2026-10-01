@@ -20,7 +20,7 @@ Zainpay ──webhook──▶ /api/payments/zainpay/webhook
 ## What you need first
 
 1. **A VPS** running Ubuntu 22.04 or 24.04. 1 vCPU, 1–2 GB RAM and 25 GB disk is plenty. You need root (or sudo) SSH access.
-2. **A domain**, e.g. `portal.tsce.edu.ng`, with a DNS **A record** pointing to the VPS IP address. Set this up first, because HTTPS needs it.
+2. **A domain**, e.g. `tsce.com.ng`, with a DNS **A record** pointing to the VPS IP address. Set this up first, because HTTPS needs it.
 3. **A Gmail address with an App Password** for outgoing email (Google Account → Security → 2-Step Verification → App passwords).
 4. **Zainpay keys** from the merchant dashboard: the public key (a JWT), the secret key and the zainbox code. Start with sandbox keys.
 
@@ -45,7 +45,7 @@ On GitHub, open the repository → **Settings → Deploy keys → Add deploy key
 # from your computer (the repo is private, so copy the script over):
 scp deploy/scripts/bootstrap.sh root@YOUR-VPS-IP:/root/
 # on the server:
-sudo bash /root/bootstrap.sh portal.tsce.edu.ng git@github.com:sudaneee/tsce.git you@example.com
+sudo bash /root/bootstrap.sh tsce.com.ng git@github.com:sudaneee/tsce.git you@example.com
 ```
 
 The script:
@@ -75,7 +75,7 @@ sudo tsce-manage preflight --send-test-email you@example.com
 
 `preflight` must end with **READY**. Fix anything marked ✘. The warnings (⚠) say what's still open, such as sandbox mode.
 
-**In the Zainpay dashboard**, set the webhook URL to `https://portal.tsce.edu.ng/api/payments/zainpay/webhook`.
+**In the Zainpay dashboard**, set the webhook URL to `https://tsce.com.ng/api/payments/zainpay/webhook`.
 
 **In the portal** (Staff → Settings): enter the director's name (it's printed on certificates), check the admissions dates and the early-bird deadline, and add your staff (Staff → Add staff).
 
@@ -151,4 +151,4 @@ sudo systemctl start tsce-gunicorn
 | "PAYMENT_GATEWAY=simulator in production" | `.env` is missing `PAYMENT_GATEWAY=zainpay`. |
 | Verification emails don't arrive | `sudo tsce-manage preflight --send-test-email you@x`. Gmail needs an *App Password*, not the account password. |
 | Payments stuck on "confirming" | Zainpay can be slow to confirm transfers. The 5-minute timer picks them up. Check `journalctl -u tsce-reconcile`. |
-| Certificate didn't issue | Is DNS pointing here? Run `dig +short portal.tsce.edu.ng`, then re-run `sudo certbot --nginx -d portal.tsce.edu.ng --redirect`. |
+| Certificate didn't issue | Is DNS pointing here? Run `dig +short tsce.com.ng`, then re-run `sudo certbot --nginx -d tsce.com.ng --redirect`. |
