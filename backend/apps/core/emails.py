@@ -10,7 +10,7 @@ from django.core.mail import send_mail
 
 logger = logging.getLogger(__name__)
 
-SIGNATURE = "\n\n— Trust Skills Center of Excellence (TSCE), Zaria"
+SIGNATURE = "\n\n— Trust Skill Acquisition Centre of Excellence (TSCE), Zaria"
 
 
 def site_link(path: str) -> str:

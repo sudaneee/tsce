@@ -33,7 +33,7 @@ class SeedSchoolTests(TestCase):
         self.assertIsNone(fs.instructor)  # demo instructor names are not seeded
 
         s = SiteSettings.load()
-        self.assertEqual(s.institution_name, "Trust Skills Center of Excellence")
+        self.assertEqual(s.institution_name, "Trust Skill Acquisition Centre of Excellence")
         self.assertEqual((s.early_bird_pct, s.excellence_pct, s.application_fee), (15, 50, 5000))
         self.assertEqual(s.current_cohort.start_date, date(2026, 10, 12))
         self.assertEqual(s.current_cohort.early_bird_deadline, date(2026, 10, 1))

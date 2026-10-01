@@ -9,7 +9,7 @@
    ========================================================================== */
 
 const TSCE_FLYER = Object.freeze({
-    name: "Trust Skills Center of Excellence",
+    name: "Trust Skill Acquisition Centre of Excellence",
     short: "TSCE",
     campaign: "Skills Acquisition Training Program 2026",
     headline: "Launch Your Tech Career This October!",
@@ -21,7 +21,7 @@ const TSCE_FLYER = Object.freeze({
     phones: ["0803 452 2501", "0904 439 2228", "0803 386 0784"],
     website: "www.tsce.edu.ng",
     email: "info@tsce.edu.ng",
-    address: "KM8, Zaria – Sokoto Road, Zango – Shamu Zaria, P.O. Box 984 Zaria, Nigeria",
+    address: "KM8, Sokoto Road, ITN Opposite Aviation Quarters Zangon Shanu Zaria, P.O. Box 984 Zaria, Nigeria",
     city: "Zaria, Kaduna State, Nigeria",
     category: "Core Technical & Digital",
     motto: ["Empowering People", "Building Skills", "Driving Sustainable Development"],

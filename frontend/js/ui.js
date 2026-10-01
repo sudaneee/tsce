@@ -59,8 +59,8 @@ const UI = (() => {
        Absolute URLs so the images also resolve inside print windows. */
     const asset = (p) => new URL(root() + p, location.href).href;
     const logo = (cls = "brand-mark") => `<img class="${cls}" src="${asset("assets/logo/tsce-emblem.png")}" alt="TSCE emblem" width="44" height="44">`;
-    const logoFull = (cls = "logo-full") => `<img class="${cls}" src="${asset("assets/logo/tsce-logo-full.png")}" alt="TSCE — Trust Skills Acquisition Centre of Excellence, Zaria">`;
-    const brand = (href = url("index.html")) => `<a class="brand" href="${href}" aria-label="Trust Skills Center of Excellence — home">${logo()}<span class="brand-text"><strong>Trust Skills</strong><small>Center of Excellence</small></span></a>`;
+    const logoFull = (cls = "logo-full") => `<img class="${cls}" src="${asset("assets/logo/tsce-logo-full.png")}" alt="TSCE — Trust Skill Acquisition Centre of Excellence, Zaria">`;
+    const brand = (href = url("index.html")) => `<a class="brand" href="${href}" aria-label="Trust Skill Acquisition Centre of Excellence — home">${logo()}<span class="brand-text"><strong>Trust Skill Acquisition</strong><small>Centre of Excellence</small></span></a>`;
 
     /* ---------- Toasts ---------- */
     function toast(title, message = "", type = "info", ms = 4200) {

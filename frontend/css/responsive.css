@@ -100,6 +100,7 @@
     .announce-bar .hide-sm { display: none; }
     .nav-actions .btn-apply-desktop { display: none; }
     .brand-text small { display: none; }
+    .site-header .brand-mark, .mn-head .brand-mark { width: 52px; height: 52px; }
     .hero { padding: 40px 0 80px; }
     .hero-ctas .btn { flex: 1; }
     .hero-meta { gap: 16px; }

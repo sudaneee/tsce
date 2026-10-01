@@ -1,7 +1,7 @@
 {
   "source": "TSCE flyer (frontend/js/data.js: TSCE_FLYER, PROGRAMME_CATALOGUE)",
   "flyer": {
-    "name": "Trust Skills Center of Excellence",
+    "name": "Trust Skill Acquisition Centre of Excellence",
     "short": "TSCE",
     "campaign": "Skills Acquisition Training Program 2026",
     "headline": "Launch Your Tech Career This October!",
@@ -21,7 +21,7 @@
     ],
     "website": "www.tsce.edu.ng",
     "email": "info@tsce.edu.ng",
-    "address": "KM8, Zaria – Sokoto Road, Zango – Shamu Zaria, P.O. Box 984 Zaria, Nigeria",
+    "address": "KM8, Sokoto Road, ITN Opposite Aviation Quarters Zangon Shanu Zaria, P.O. Box 984 Zaria, Nigeria",
     "city": "Zaria, Kaduna State, Nigeria",
     "category": "Core Technical & Digital",
     "motto": [

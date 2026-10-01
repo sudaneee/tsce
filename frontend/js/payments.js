@@ -19,7 +19,7 @@ const ZainpaySimulator = (() => {
     const config = {
         environment: "sandbox",                              // "sandbox" | "live"
         baseUrl: "https://sandbox.zainpay.ng",                // documented sandbox host (not called)
-        merchantName: "Trust Skills Center of Excellence",
+        merchantName: "Trust Skill Acquisition Centre of Excellence",
         publicKeyHint: "ZP_SANDBOX_PUBLIC_KEY (server-side only in production)"
     };
     const pad = (n, l) => String(n).padStart(l, "0");

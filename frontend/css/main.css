@@ -1,6 +1,6 @@
 /* ==========================================================================
    TSCE Digital Platform — Design System & Public Website
-   Trust Skills Center of Excellence, Zaria
+   Trust Skill Acquisition Centre of Excellence, Zaria
    --------------------------------------------------------------------------
    1. Tokens          5. Components (buttons, forms, badges, cards)
    2. Reset/base      6. Modal, toast, empty states
@@ -67,7 +67,7 @@
 
     --ease: cubic-bezier(.2, .8, .2, 1);
     --container: 1200px;
-    --header-h: 72px;
+    --header-h: 84px;
 }
 
 /* 2. RESET / BASE -------------------------------------------------------- */
@@ -121,6 +121,8 @@ p { margin: 0 0 1em; color: var(--text-2); }
 .section-sm { padding: 64px 0; }
 .section-alt { background: var(--background); }
 .section-head { max-width: 720px; margin-bottom: 48px; }
+/* Public website: section and page headings in capitals (portals are unaffected). */
+body:not(.portal) main h1, body:not(.portal) main h2 { text-transform: uppercase; letter-spacing: .01em; }
 .section-head.center { margin-left: auto; margin-right: auto; text-align: center; }
 .section-head.center .eyebrow { justify-content: center; }
 .section-head.center .lead { margin-left: auto; margin-right: auto; }
@@ -349,7 +351,8 @@ p { margin: 0 0 1em; color: var(--text-2); }
 /* Logo */
 .brand { display: inline-flex; align-items: center; gap: 12px; color: var(--primary-dark); }
 .brand:hover { color: var(--primary-dark); }
-.brand-mark { width: 44px; height: 44px; flex: none; object-fit: contain; }
+.brand-mark { width: 64px; height: 64px; flex: none; object-fit: contain; }
+.sidebar .brand-mark { width: 48px; height: 48px; }
 /* On dark surfaces the emblem sits on a white badge so the navy hand stays visible */
 .sidebar .brand-mark, .site-footer .brand-mark, .auth-side .brand-mark, .id-card .brand-mark { background: #fff; border-radius: 50%; padding: 3px; box-shadow: 0 0 0 2px rgba(255,255,255,.15); }
 .logo-full { display: block; height: auto; }
