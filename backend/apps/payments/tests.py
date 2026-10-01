@@ -84,9 +84,9 @@ class ZainpayGatewayTests(TestCase):
 
     @mock.patch("apps.payments.gateways.requests.get")
     def test_verify_flat_deposit_record_is_success(self, get):
-        get.return_value = resp(200, {"txnRef": "R1", "amountAfterCharges": 49800, "paymentChannel": "card"})
+        get.return_value = resp(200, {"txnRef": "R1", "depositedAmount": "50300", "amountAfterCharges": 49800, "paymentChannel": "card"})
         r = self.gw.verify("R1")
-        self.assertEqual((r.status, r.channel), (SUCCESS, "card"))
+        self.assertEqual((r.status, r.channel, r.deposited), (SUCCESS, "card", 50300.0))
         self.assertIn("/virtual-account/wallet/deposit/verify/v2/R1", get.call_args.args[0])
 
     @mock.patch("apps.payments.gateways.requests.get")
@@ -350,7 +350,7 @@ class WebhookTests(PaymentFlowTestCase):
     def test_bad_signature_is_rejected_and_logged(self, verify):
         payment = self.pending_zainpay_payment()
         res = self.post_webhook({"event": "deposit.successful", "data": {"txnRef": payment.reference}}, secret="wrong")
-        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.status_code, 401)
         verify.assert_not_called()
         self.assertEqual(WebhookEvent.objects.get().error, "invalid signature")
 
@@ -365,6 +365,32 @@ class WebhookTests(PaymentFlowTestCase):
         payment = self.pending_zainpay_payment()
         self.assertEqual(self.post_webhook({"event": "deposit.successful", "data": {"txnRef": payment.reference}}).status_code, 200)
         self.assertIn("verify failed", WebhookEvent.objects.get().error)
+
+    @mock.patch("apps.payments.gateways.ZainpayGateway.verify")
+    def test_documented_deposit_success_payload(self, verify):
+        """The payload shape from Zainpay's webhook docs, signed exactly as documented."""
+        payment = self.pending_zainpay_payment()
+        verify.return_value = VerifyResult(SUCCESS, {"txnRef": payment.reference}, deposited=5300.0)
+        body = {"event": "deposit.success", "data": {"depositedAmount": "5300", "txnChargesAmount": "75",
+                "amountAfterCharges": "5225", "txnRef": payment.reference, "txnType": "deposit", "zainboxCode": "ZB-TSCE"}}
+        self.assertEqual(self.post_webhook(body).status_code, 200)
+        self.assertEqual(self.refresh().status, "Admitted")
+
+    @mock.patch("apps.payments.gateways.ZainpayGateway.verify")
+    def test_underpayment_is_not_accepted(self, verify):
+        payment = self.pending_zainpay_payment()
+        verify.return_value = VerifyResult(SUCCESS, {"txnRef": payment.reference}, deposited=3000.0)
+        self.post_webhook({"event": "deposit.success", "data": {"txnRef": payment.reference}})
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, "FAILED")
+        self.assertIn("Underpaid", payment.failure_reason)
+        self.assertEqual(self.refresh().status, "Pending")  # no admission for a short payment
+        self.assertTrue(Notification.objects.filter(recipient=self.staff, title="Underpayment — follow up").exists())
+        # A later "success" for the same short transfer still doesn't give value
+        call_command("reconcile_payments", stdout=StringIO())
+        self.client.post(f"/api/payments/{payment.reference}/check", **self.csrf())
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, "FAILED")
 
     @mock.patch("apps.payments.gateways.ZainpayGateway.verify", return_value=VerifyResult(SUCCESS, {"txnRef": "x"}))
     def test_reconcile_command_confirms_missed_payments(self, verify):

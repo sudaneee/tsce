@@ -23,6 +23,8 @@ from apps.admissions.models import Application
 from apps.core.exceptions import ServiceError
 
 from . import services
+from apps.core.background import run_in_background
+
 from .gateways import GatewayError
 from .models import Payment, WebhookEvent
 
@@ -185,26 +187,33 @@ def zainpay_webhook(request):
         logger.warning("Zainpay webhook with invalid signature (event %s)", event.pk)
         event.error = "invalid signature"
         event.save(update_fields=["error"])
-        return JsonResponse({"status": "error", "reason": "invalid signature"}, status=400)
+        return JsonResponse({"status": "error", "reason": "invalid signature"}, status=401)
 
-    reason = "processed"
+    if "deposit" not in event_type.lower():
+        event.error = f"event {event_type!r} ignored"
+        event.save(update_fields=["error"])
+        return JsonResponse({"status": "ok", "reason": event.error})
+    # Zainpay asks for a 200 straight away; verifying and confirming (Zainpay API call,
+    # emails) happens in the background. If that's interrupted, reconcile_payments finishes it.
+    run_in_background(process_webhook_event, event.pk)
+    return JsonResponse({"status": "ok", "reason": "accepted"})
+
+
+def process_webhook_event(event_id: int):
+    event = WebhookEvent.objects.get(pk=event_id)
     try:
-        payment = Payment.objects.filter(reference=ref).first() if ref else None
-        if "deposit" not in event_type.lower():
-            reason = f"event {event_type!r} ignored"
-        elif payment is None:
-            reason = "unknown txnRef"
+        payment = Payment.objects.filter(reference=event.reference).first() if event.reference else None
+        if payment is None:
+            event.error = "unknown txnRef"
         else:
             services.process_payment(payment)
-            event.processed = True
+            event.processed, event.error = True, ""
     except GatewayError as exc:
-        reason = f"verify failed: {exc}"
-    except Exception as exc:  # never let Zainpay retry forever because of our bug
-        logger.exception("Zainpay webhook error (event %s)", event.pk)
-        reason = f"error: {exc}"
-    event.error = "" if event.processed else reason[:1000]
+        event.error = f"verify failed: {exc}"[:1000]
+    except Exception as exc:  # logged; reconcile_payments will retry the payment
+        logger.exception("Zainpay webhook processing error (event %s)", event.pk)
+        event.error = f"error: {exc}"[:1000]
     event.save(update_fields=["processed", "error"])
-    return JsonResponse({"status": "ok", "reason": reason})
 
 
 # ---------------------------------------------------------------------------

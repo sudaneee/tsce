@@ -22,3 +22,4 @@ import sys  # noqa: E402
 
 if "test" in sys.argv:
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+    BACKGROUND_TASKS_INLINE = True

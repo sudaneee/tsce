@@ -44,6 +44,14 @@ class VerifyResult:
     raw: dict = field(default_factory=dict)
     channel: str = ""
     failure_reason: str = ""
+    deposited: float | None = None    # what the payer actually sent, when the gateway says
+
+
+def _number(value):
+    try:
+        return float(str(value).replace(",", ""))
+    except (TypeError, ValueError):
+        return None
 
 
 def _zainpay_cfg():
@@ -113,7 +121,11 @@ class ZainpayGateway:
         record = result if "txnRef" in result else (result.get("data") if isinstance(result.get("data"), dict) else {})
         if resp.status_code == 200 and "txnRef" in record:
             channel = str(record.get("paymentChannel") or record.get("channel") or "").lower()
-            return VerifyResult(SUCCESS, result, channel="card" if "card" in channel else "transfer" if channel else "")
+            # depositedAmount is what the payer sent (before Zainpay's own charges). The verify
+            # endpoint reports naira; even if a field were in kobo it would only be larger,
+            # so "less than the fee" can never wrongly reject a correct payment.
+            return VerifyResult(SUCCESS, result, channel="card" if "card" in channel else "transfer" if channel else "",
+                                deposited=_number(record.get("depositedAmount")))
 
         reconciled = self._reconcile(reference)
         return reconciled or VerifyResult(PENDING, result)

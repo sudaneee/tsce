@@ -19,9 +19,17 @@ def site_link(path: str) -> str:
 
 
 def send_email(subject: str, message: str, to_email: str) -> bool:
+    """Queues the email in the background (SMTP can take seconds); returns whether one was queued."""
     if not to_email:
         logger.info('send_email: no recipient for "%s" — skipped.', subject)
         return False
+    from .background import run_in_background
+
+    run_in_background(_send_now, subject, message, to_email)
+    return True
+
+
+def _send_now(subject: str, message: str, to_email: str) -> bool:
     try:
         send_mail(subject=subject, message=message + SIGNATURE, from_email=settings.DEFAULT_FROM_EMAIL,
                   recipient_list=[to_email], fail_silently=False)

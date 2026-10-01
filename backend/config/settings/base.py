@@ -152,6 +152,9 @@ EMAIL_BACKEND = env(
 )
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default=f"TSCE <{EMAIL_HOST_USER}>" if EMAIL_HOST_USER else "TSCE <no-reply@tsce.edu.ng>")
 
+# Email sending and webhook processing run in background threads (inline in tests).
+BACKGROUND_TASKS_INLINE = False
+
 # Public address of the site, used to build links in emails (verification, payments).
 SITE_URL = env("SITE_URL", default="http://localhost:8000")
 # Email-verification links stay valid this long.

@@ -92,7 +92,17 @@ def apply_result(payment: Payment, result: VerifyResult) -> Payment:
         if payment.status in (Payment.Status.SUCCESS, Payment.Status.REFUNDED):
             return payment
         payment.gateway_payload = {**(payment.gateway_payload or {}), "verify": result.raw}
-        if result.status == SUCCESS:
+        if result.status == SUCCESS and result.deposited is not None and result.deposited < payment.amount:
+            # Bank transfers can arrive short. Never give value for less than the fee.
+            if payment.status == Payment.Status.PENDING:
+                payment.status = Payment.Status.FAILED
+                payment.failure_reason = (f"Underpaid: received {result.deposited:,.0f}, "
+                                          f"expected {payment.amount:,} (+ Zainpay charge)")
+                payment.save()
+                _flag_underpayment(payment)
+            else:
+                payment.save(update_fields=["gateway_payload", "updated_at"])
+        elif result.status == SUCCESS:
             payment.status = Payment.Status.SUCCESS
             payment.verified_at = timezone.now()
             payment.channel = result.channel or payment.channel
@@ -112,6 +122,17 @@ def apply_result(payment: Payment, result: VerifyResult) -> Payment:
         else:
             payment.save(update_fields=["gateway_payload", "updated_at"])
     return payment
+
+
+def _flag_underpayment(payment: Payment):
+    from apps.admissions.models import ApplicationEvent
+    from apps.comms.models import Notification
+    from apps.comms.services import notify_staff
+
+    if payment.application_id:
+        ApplicationEvent.objects.create(application=payment.application, text=f"Payment {payment.reference} not accepted — {payment.failure_reason}")
+    notify_staff("Underpayment — follow up", f"{payment.name}: {payment.failure_reason}. Ref {payment.reference}.",
+                 Notification.Type.PAYMENT)
 
 
 def process_payment(payment: Payment) -> Payment:
