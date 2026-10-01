@@ -9,6 +9,7 @@ DATA=/var/lib/tsce
 DEST=/var/backups/tsce
 KEEP_DAYS=30
 STAMP=$(date +%Y%m%d-%H%M)
+cd /   # may be started from a folder this user can't read (e.g. root's home)
 
 mkdir -p "$DEST"
 # .backup is safe while the site is running (unlike copying the file).

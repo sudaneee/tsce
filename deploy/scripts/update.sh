@@ -4,6 +4,7 @@
 set -euo pipefail
 
 APP=/srv/tsce
+cd /   # the tsce user can't read root's home, where this is often started
 manage() { sudo -u tsce -H bash -c "cd $APP/backend && .venv/bin/python manage.py $*"; }
 
 echo "==> Backup before updating"
