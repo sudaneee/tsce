@@ -23,13 +23,17 @@ echo "==> Services (picks up any changed unit files)"
 cp "$APP"/deploy/systemd/tsce-*.service "$APP"/deploy/systemd/tsce-*.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl restart tsce-gunicorn
-sed "s/__DOMAIN__/$(grep -oP '(?<=^DJANGO_ALLOWED_HOSTS=)[^,]+' $APP/backend/.env)/g" "$APP/deploy/nginx/tsce.conf" > /tmp/tsce.nginx.new
-# certbot edits the live nginx file, so only report template drift instead of overwriting it.
-if ! diff -q <(grep -v ssl /tmp/tsce.nginx.new) <(grep -v -e ssl -e '# managed by Certbot' /etc/nginx/sites-available/tsce) >/dev/null 2>&1; then
-    echo "!! deploy/nginx/tsce.conf changed — review and merge it into /etc/nginx/sites-available/tsce by hand"
+# certbot edits the live nginx file, so it is never overwritten here. Instead, warn when
+# the template in the repo has changed since it was last installed/merged by hand.
+DOMAIN=$(grep -oP '(?<=^DJANGO_ALLOWED_HOSTS=)[^,]+' "$APP/backend/.env")
+TEMPLATE_SUM=$(sha256sum "$APP/deploy/nginx/tsce.conf" | cut -d' ' -f1)
+if [ "$TEMPLATE_SUM" != "$(cat /var/lib/tsce/nginx-template.sha256 2>/dev/null)" ]; then
+    echo "!! deploy/nginx/tsce.conf has changed since it was installed. Merge the changes into"
+    echo "   /etc/nginx/sites-available/tsce by hand (keep certbot's lines), run nginx -t && systemctl reload nginx,"
+    echo "   then record it:  sha256sum $APP/deploy/nginx/tsce.conf | cut -d' ' -f1 > /var/lib/tsce/nginx-template.sha256"
 fi
 
 echo "==> Health"
 sleep 2
-curl -fsS --unix-socket /run/tsce/gunicorn.sock http://localhost/api/health && echo
+curl -fsS --unix-socket /run/tsce/gunicorn.sock -H "Host: $DOMAIN" http://localhost/api/health && echo
 manage preflight || echo "!! preflight reported problems (see above)"

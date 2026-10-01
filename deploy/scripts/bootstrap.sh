@@ -132,6 +132,8 @@ if ! nginx -t; then
     exit 1
 fi
 systemctl reload nginx
+# Remember which template version is installed (update.sh warns when the repo's copy changes).
+sha256sum "$APP/deploy/nginx/tsce.conf" | cut -d' ' -f1 > "$DATA/nginx-template.sha256"
 
 step "HTTPS (Let's Encrypt)"
 if [ "$CERT_EMAIL" = "-" ]; then EMAIL_ARGS=(--register-unsafely-without-email); else EMAIL_ARGS=(-m "$CERT_EMAIL"); fi
