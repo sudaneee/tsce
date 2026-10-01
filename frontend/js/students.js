@@ -58,19 +58,18 @@ const Students = (() => {
             </div></div>`;
     }
     function printCertificate(s) { UI.printHTML(`Certificate ${s.certificateNo}`, `<style>@page{size:A4 landscape;margin:10mm}</style>${certificateHTML(s)}`); }
+    /** Public check: { status: "valid" | "revoked" | "not_found", number, holder?, programme?, cohort?, issuedAt? } */
     function verify(no) {
-        const s = DB.first("students", (x) => x.certificateNo.toLowerCase() === String(no).trim().toLowerCase());
-        return s && s.certificateStatus === "Issued" ? { ok: true, s } : { ok: false, s };
+        return API.get("certificates/verify", { no: String(no).trim() });
     }
-    function verifyResultHTML(no) {
-        if (!no) return "";
-        const r = verify(no);
-        if (r.ok) {
-            const p = Programmes.get(r.s.programmeId);
-            return `<div class="card card-pad" style="border-color:rgba(18,161,80,.35);background:linear-gradient(135deg,#F3FCF6,#fff)"><div class="flex" style="align-items:flex-start"><span class="icon-tile green" style="width:56px;height:56px;font-size:1.4rem"><i class="fa-solid fa-shield-halved"></i></span><div style="flex:1"><div class="flex between flex-wrap"><h3 class="mb-0">Certificate verified</h3>${UI.badge("VERIFIED")}</div><p class="small muted">This certificate is authentic and was issued by ${TSCE_FLYER.name}.</p>
-                <div class="kv"><div><small>Holder</small><strong>${UI.esc(fullName(r.s))}</strong></div><div><small>Certificate No.</small><strong class="mono">${UI.esc(r.s.certificateNo)}</strong></div><div><small>Programme</small><strong>${UI.esc(p.name)}</strong></div><div><small>Issued</small><strong>${UI.date(r.s.certificateIssuedAt)}</strong></div></div></div></div></div>`;
+    function verifyResultHTML(r) {
+        if (!r) return "";
+        const no = r.number;
+        if (r.status === "valid") {
+            return `<div class="card card-pad" style="border-color:rgba(18,161,80,.35);background:linear-gradient(135deg,#F3FCF6,#fff)"><div class="flex" style="align-items:flex-start"><span class="icon-tile green" style="width:56px;height:56px;font-size:1.4rem"><i class="fa-solid fa-shield-halved"></i></span><div style="flex:1"><div class="flex between flex-wrap"><h3 class="mb-0">Certificate verified</h3>${UI.badge("VERIFIED")}</div><p class="small muted">This certificate is authentic and was issued by ${UI.esc(Site.settings?.institution.name || TSCE_FLYER.name)}.</p>
+                <div class="kv"><div><small>Holder</small><strong>${UI.esc(r.holder)}</strong></div><div><small>Certificate No.</small><strong class="mono">${UI.esc(r.number)}</strong></div><div><small>Programme</small><strong>${UI.esc(r.programme)}</strong></div><div><small>Issued</small><strong>${UI.date(r.issuedAt)}</strong></div><div><small>Cohort</small><strong>${UI.esc(r.cohort)}</strong></div></div></div></div></div>`;
         }
-        if (r.s) return `<div class="alert warning"><i class="fa-solid fa-hourglass-half"></i><p><b>${UI.esc(no)}</b> is reserved for <b>${UI.esc(fullName(r.s))}</b> but has not been issued yet (programme in progress).</p></div>`;
+        if (r.status === "revoked") return `<div class="alert danger"><i class="fa-solid fa-ban"></i><p>Certificate <b>${UI.esc(no)}</b> has been <b>revoked</b> and is no longer valid. Contact TSCE for details.</p></div>`;
         return `<div class="alert danger"><i class="fa-solid fa-circle-xmark"></i><p>No certificate found with number <b>${UI.esc(no)}</b>. Check the number and try again, or contact TSCE.</p></div>`;
     }
     return { all, get, fullName, grade, gradeTone, attendance, results, modules, eligibility, certState, certificateHTML, printCertificate, verify, verifyResultHTML };
@@ -323,8 +322,8 @@ Pages["student-settings"] = function (view, { student: s, session }) {
         <div class="dash-grid cols-2">
             <div class="panel"><div class="panel-head"><h3><i class="fa-solid fa-key"></i>Change password</h3></div><div class="panel-body">
                 <form id="pwForm" class="form-grid" novalidate style="grid-template-columns:1fr">
-                    <div class="field"><label for="pw0">Current password <span class="req">*</span></label><input id="pw0" type="password" class="input" required autocomplete="current-password"></div>
-                    <div class="field"><label for="pw1">New password <span class="req">*</span></label><input id="pw1" type="password" class="input" required minlength="6" autocomplete="new-password"></div>
+                    <div class="field"><label for="pw0">Current password <span class="req">*</span></label><input id="pw0" name="currentPassword" type="password" class="input" required autocomplete="current-password"></div>
+                    <div class="field"><label for="pw1">New password <span class="req">*</span></label><input id="pw1" name="newPassword" type="password" class="input" required minlength="8" autocomplete="new-password"></div>
                     <div class="field"><label for="pw2">Confirm new password <span class="req">*</span></label><input id="pw2" type="password" class="input" required data-match="pw1" autocomplete="new-password"></div>
                     <div><button class="btn btn-primary">Update password</button></div></form></div></div>
             <div class="panel"><div class="panel-head"><h3><i class="fa-regular fa-bell"></i>Notifications</h3></div><div class="panel-body">
@@ -333,12 +332,12 @@ Pages["student-settings"] = function (view, { student: s, session }) {
     UI.$$("[data-pref]").forEach((c) => c.onchange = () => { prefs[c.dataset.pref] = c.checked; DB.update("students", s.id, { prefs }); UI.toast("Preferences saved", "", "success", 1800); });
     const f = UI.$("#pwForm");
     UI.liveValidate(f);
-    f.onsubmit = (e) => {
+    f.onsubmit = async (e) => {
         e.preventDefault(); if (!UI.validate(f)) return;
-        const u = DB.first("users", (x) => x.email === session.email);
-        if (u.password !== UI.$("#pw0").value) { UI.fieldError(UI.$("#pw0"), "Current password is incorrect."); return; }
-        DB.save("users", DB.all("users").map((x) => x.email === u.email ? { ...x, password: UI.$("#pw1").value } : x));
-        f.reset(); UI.toast("Password updated", "Use your new password next time you sign in.", "success");
+        try {
+            await Auth.changePassword(UI.$("#pw0").value, UI.$("#pw1").value);
+            f.reset(); UI.toast("Password updated", "Use your new password next time you sign in.", "success");
+        } catch (err) { if (!API.showFieldErrors(f, err)) UI.toast("Couldn't update password", err.message, "error"); }
     };
 };
 
@@ -631,15 +630,22 @@ Pages["staff-certificates"] = function (view) {
         UI.$("#cRevoke", m.el)?.addEventListener("click", async () => { if (!(await UI.confirm({ title: "Revoke certificate?", message: "Verification will fail for this certificate number.", confirmText: "Revoke", tone: "danger", icon: "fa-ban" }))) return; DB.update("students", id, { certificateStatus: "Revoked" }); m.close(); UI.toast("Certificate revoked", s.certificateNo, "warning"); refresh(); });
     }
     UI.$("#cSearch").addEventListener("input", UI.debounce(refresh, 150));
-    UI.$("#cvForm").onsubmit = (e) => { e.preventDefault(); UI.$("#cvRes").innerHTML = Students.verifyResultHTML(UI.$("#cvNo").value); };
+    UI.$("#cvForm").onsubmit = async (e) => {
+        e.preventDefault();
+        try { UI.$("#cvRes").innerHTML = Students.verifyResultHTML(await Students.verify(UI.$("#cvNo").value)); }
+        catch (err) { UI.toast("Verification failed", err.message, "error"); }
+    };
     refresh();
 };
 
 /* ---------------- Public: Verify certificate ---------------- */
 Pages["verify"] = function () {
     const f = UI.$("#verifyForm"), i = UI.$("#verifyNo"), out = UI.$("#verifyResult");
-    const run = () => { out.innerHTML = UI.skeleton(3); setTimeout(() => out.innerHTML = Students.verifyResultHTML(i.value), 500); };
+    const run = async () => {
+        out.innerHTML = UI.skeleton(3);
+        try { out.innerHTML = Students.verifyResultHTML(await Students.verify(i.value)); }
+        catch (err) { out.innerHTML = `<div class="alert danger"><i class="fa-solid fa-circle-exclamation"></i><p>${UI.esc(err.message)}</p></div>`; }
+    };
     f.onsubmit = (e) => { e.preventDefault(); if (!i.value.trim()) { UI.fieldError(i, "Enter a certificate number."); return; } UI.fieldError(i, ""); run(); };
-    UI.$$("[data-sample]").forEach((b) => b.onclick = () => { i.value = b.dataset.sample; run(); });
     if (UI.param("no")) { i.value = UI.param("no"); run(); }
 };

@@ -8,6 +8,7 @@ Turning the approved frontend demo (HTML/CSS/JS + localStorage) into a productio
 |---|---|
 | Timeline | Online application + payment must be live for the **October 2026 cohort** (enrolment 1–12 Oct, classes start 12 Oct). Ship an MVP first; the rest follows after launch. |
 | Payments | Real **Zainpay** integration. TSCE has sandbox keys. The simulator stays as a dev-only gateway. |
+| Zainpay charges | The **payer pays a ₦300 transaction charge**. It's shown on the invoice and added only to what Zainpay collects, never to fees, receipts or reports. **Bank transfer only.** Both are `.env` settings (`ZAINPAY_PAYER_CHARGE`, `ZAINPAY_CHANNELS`). |
 | Hosting | **VPS** (Ubuntu + nginx + gunicorn + systemd + Let's Encrypt). SQLite on persistent disk, daily backups. |
 | Learning content | No uploaded lectures or resources in v1. The Learning page is simplified to the module list and progress; the generated "resources" are removed. |
 | Email / SMS | No SMS. Email comes later. Until then, Django's file/console email backend is used and in-app notifications work. Password reset is done by admin from the staff portal until email exists. |
@@ -118,20 +119,31 @@ Permissions: `IsApplicant`, `IsStudent`, `IsStaff` (staff+admin), `IsAdmin`. Stu
 - [ ] ~~`seed_demo`~~ moved to Phase 5b, so demo data is created through the real services instead of duplicating their logic
 
 **Phase 2 — Auth**
-- [ ] Login/logout/me, role guards, `createsuperuser` → admin role
-- [ ] Wire `auth.js` + `login.html`; remove demo-login buttons/credentials panel
+- [x] `auth/login` (CSRF-protected, rate-limited 10/min per IP, "keep me signed in"), `auth/logout`, `auth/me`, `auth/change-password`
+- [x] Role permissions (`IsApplicant`, `IsStudent`, `IsPortalStaff`, `IsAdmin`); 401 = sign in again, 403 = not allowed
+- [x] Admin password reset (`staff/users/{id}/reset-password`) → temporary password + forced change at next login (no email yet)
+- [x] `auth.js` on server sessions; router loads the user once per page; demo logins, DEMO chip and Explore tour removed; Change password in the portal user menu
+- [x] 14 auth API tests + browser test (headless Edge) of login, redirects, logout, session expiry, forced password change
 
 **Phase 3 — Public site & application**
-- [ ] Programmes catalogue/detail with live seat counts
-- [ ] Application wizard → `POST applications` with WAEC upload (PDF/JPG/PNG, ≤5 MB), server-side validation and discount quote
-- [ ] Contact enquiries, public news, certificate verify
-- [ ] Remove DEMO MODE chip / Explore tour / "Autofill demo applicant"
+- [x] `GET /api/site`: public settings and the programme catalogue with live seat counts, loaded once per page (`Site`). Early-bird status and the admissions window are decided by the server in Lagos time.
+- [x] Application wizard → `POST /api/applications` (multipart). Server validation (Nigerian phone, age, WAEC rules, schedule offered by the programme), WAEC upload checked by content and kept in private storage, admissions window and capacity enforced, award requests, applicant account created and signed in. Existing accounts must give their password, and duplicate applications are refused.
+- [x] `GET /api/applications/{number}` for the owner or staff
+- [x] Contact enquiries (`POST /api/enquiries`), public news (`GET /api/announcements/public`), certificate verify (`GET /api/certificates/verify?no=`)
+- [x] Removed: autofill demo applicant, demo certificate numbers, invented home-page statistics and testimonials (hidden until TSCE supplies real ones). Application drafts moved to sessionStorage, which suits shared computers.
+- [x] Browser tests now live in the repo: `bash e2e/run.sh` (auth + public suites)
 
 **Phase 4 — Zainpay**
-- [ ] `ZainpayGateway` (server-side keys in `.env`): initialize → redirect to hosted checkout → callback page → verify
-- [ ] Webhook endpoint with signature check, idempotent processing, `WebhookEvent` log
-- [ ] `payment.html` / `success.html` rewired (card/transfer handled by Zainpay checkout), receipts
-- [ ] Simulator gateway selectable via `PAYMENT_GATEWAY=simulator` for local dev
+- [x] `ZainpayGateway` ported from the Glittering Field Academy integration (live-tested): initialize → hosted checkout → verify v2, with both success shapes handled, the ambiguous "Txn not found" response never treated as final, and the reconcile endpoint as fallback. Keys only in `.env`.
+- [x] Webhook `POST /api/payments/zainpay/webhook`: stored raw (`WebhookEvent`), HMAC-SHA256 `Zainpay-Signature` checked, payment **re-verified via the API** (body never trusted), idempotent, always 200 except a bad signature
+- [x] Callback `GET /api/payments/zainpay/callback?txnRef=` → success page or back to the invoice (failed/pending). Missing `txnRef` is recovered only from the same browser session, never by guessing.
+- [x] `reconcile_payments` command for cron (every 5 min) as the safety net
+- [x] Payment confirmed → application Paid, Student record + student number, Enrollment (Admission Pending, or Active if already accepted), account upgraded to student, notifications. Duplicate payments are flagged to staff for refund, never double-enrolled.
+- [x] Re-quote at checkout (early bird depends on the **payment** date) and capacity re-checked
+- [x] `payment.html` / `success.html` rewired: invoice → Zainpay hosted page → result; pending payments re-checked automatically; receipt built from server data
+- [x] Simulator gateway (`PAYMENT_GATEWAY=simulator`) with a local checkout page for development and demos. Production refuses to start with it unless `ALLOW_PAYMENT_SIMULATOR=true`.
+- [x] 22 payment unit tests + browser suite `e2e/test_payments.py`
+- [ ] **Sandbox run with TSCE's real Zainpay keys** (card + transfer, webhook delivery to a public URL, reconcile). Confirm: `paymentChannels` values, the webhook event names, and that the paid amount is enforced on transfers.
 
 **Phase 5 — Staff admissions & finance**
 - [ ] Applications list/filters/detail drawer/lifecycle actions/print
@@ -142,8 +154,13 @@ Permissions: `IsApplicant`, `IsStudent`, `IsStaff` (staff+admin), `IsAdmin`. Stu
 **Phase 5b — Demo/staging data**
 - [ ] `seed_demo` command (staging only): builds demo applicants, payments and students by calling the real services
 
+**Before go-live (carried from earlier phases)**
+- [ ] Staff portal pages not yet wired to the API still show the old browser demo data. At launch, hide or disable every page that isn't wired yet (students, attendance, assessments, certificates, reports, etc.).
+- [ ] Student portal shows an "almost ready" placeholder until Phase 7. Decide what paid students see at launch (at minimum: admission status + receipt).
+
 **Phase 6 — Deploy (VPS)**
 - [ ] nginx + gunicorn + systemd, HTTPS (Let's Encrypt), `collectstatic`, media dir permissions
+- [ ] cron: `reconcile_payments` every 5 minutes
 - [ ] Production settings (DEBUG off, secure cookies, HSTS, allowed hosts), daily SQLite + media backup (cron, `sqlite3 .backup`)
 - [ ] Zainpay sandbox end-to-end test → switch to live keys
 
@@ -161,8 +178,11 @@ Throughout: tests for discounts, mark-paid, status transitions, award refunds, w
 
 ## Open items / needs from client
 
-- Zainpay sandbox **public key, secret key, zainbox code, webhook secret** (to `.env`, never committed); live keys before go-live.
+- Zainpay sandbox **public key (JWT), secret key, zainbox code** (to `.env`, never committed); live keys before go-live. Register the webhook URL `https://<domain>/api/payments/zainpay/webhook` in the Zainpay dashboard.
 - VPS access + domain/DNS (`tsce.edu.ng` subdomain?).
 - Sending email account (later).
 - **Early-bird deadline**: the flyer date (before 1 Oct 2026) has already passed. Does TSCE want to extend it? It is a setting in Staff → Settings, so no code change is needed either way.
-- Real staff list (names, titles, emails) for the initial admin/staff accounts and programme instructors.
+- Real staff list (names, titles, emails) for the initial admin/staff accounts and programme instructors. The director's name is also needed for certificates.
+- **Admissions dates conflict:** the flyer opens enrolment on **1 October** but the early-bird discount needs payment **before 1 October**, so nobody could ever qualify. Confirm the real enrolment opening date (and whether early bird is still on offer). Both are editable settings.
+- Real home-page statistics and testimonials, or keep those sections hidden.
+- Confirm the event dates on the News page (intake exams 3–7 Oct, orientation 10 Oct). They came from the demo, not the flyer.

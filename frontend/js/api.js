@@ -112,3 +112,26 @@ const API = (() => {
         showFieldErrors
     };
 })();
+
+/* ==========================================================================
+   Site data every page needs (GET /api/site): public settings + programme
+   catalogue. The router loads it once per page; modules then read it
+   synchronously (Site.settings, Site.programmes).
+   ========================================================================== */
+const Site = (() => {
+    let data = null;
+    async function load() {
+        try { data = await API.get("site"); }
+        catch (e) { data = null; console.warn("TSCE: couldn't load site data —", e.message); }
+        return data;
+    }
+    /** "2026-10-12" → local midnight (new Date("2026-10-12") would be UTC, i.e. the day before in the Americas). */
+    const day = (iso) => iso ? new Date(iso + "T00:00:00") : null;
+    return {
+        load, day,
+        get ready() { return !!data; },
+        get settings() { return data ? data.settings : null; },
+        get programmes() { return data ? data.programmes : []; },
+        get cohortDate() { return data?.settings.admissions.cohortDate || null; }
+    };
+})();

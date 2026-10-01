@@ -3,17 +3,15 @@
    ========================================================================== */
 
 const Programmes = (() => {
-    const all = () => DB.all("programmes");
+    const all = () => Site.programmes;
     const active = () => all().filter((p) => p.status === "Active");
-    const get = (id) => DB.get("programmes", id);
+    const get = (id) => all().find((p) => p.id === id) || null;
     const name = (id) => get(id)?.name || "—";
     const tracks = () => [...new Set(all().map((p) => p.track))];
 
-    /** Live enrolment = seeded historical count + enrolled records for the current intake. */
+    /** Seats for the current intake, counted on the server (paid, not rejected). */
     function seats(p) {
-        const live = DB.where("applications", (a) => a.programmeId === p.id && a.intake === DB.settings().admissions?.intake && ["Paid", "Accepted", "Enrolled", "Under Review"].includes(a.status)).length;
-        const enrolled = Math.min(p.capacity, p.enrolled + live);
-        return { enrolled, capacity: p.capacity, available: Math.max(0, p.capacity - enrolled), pct: Math.round(enrolled / p.capacity * 100) };
+        return p.seats || { enrolled: 0, capacity: p.capacity, available: p.capacity, pct: 0 };
     }
 
     function card(p) {
@@ -38,17 +36,18 @@ const Programmes = (() => {
         const p = get(id);
         if (!p) return UI.toast("Programme not found", "", "error");
         const s = seats(p);
-        const set = DB.settings().admissions || {};
-        const ebActive = new Date() < new Date(set.earlyBirdDeadline || TSCE_FLYER.earlyBirdDeadline);
+        const set = Site.settings?.admissions || {};
+        const ebActive = Discounts.earlyBirdOpen();
+        const eb = Discounts.compute(p.fee);
         const body = `
             <div class="pd-facts">
                 <div><small>Duration</small><strong>${p.weeks} Weeks</strong></div>
                 <div><small>Programme Fee</small><strong>${UI.naira(p.fee)}</strong></div>
-                <div><small>Starts</small><strong>${UI.date(set.cohortDate || TSCE_FLYER.startDate)}</strong></div>
+                <div><small>Starts</small><strong>${UI.date(Site.day(set.cohortDate))}</strong></div>
                 <div><small>Available Seats</small><strong>${s.available} / ${s.capacity}</strong></div>
             </div>
             <div style="padding:24px">
-                ${ebActive ? `<div class="alert success mb-3"><i class="fa-solid fa-bolt"></i><p><b>Early-bird offer:</b> pay before 1 October 2026 and pay <b>${UI.naira(p.fee * .85)}</b> instead of ${UI.naira(p.fee)} (15% off).</p></div>` : ""}
+                ${ebActive ? `<div class="alert success mb-3"><i class="fa-solid fa-bolt"></i><p><b>Early-bird offer:</b> pay before ${UI.dateLong(Discounts.deadline())} and pay <b>${UI.naira(eb.payable)}</b> instead of ${UI.naira(p.fee)} (${eb.pct}% off).</p></div>` : ""}
                 <div class="grid grid-2" style="gap:28px">
                     <div>
                         <div class="pd-section"><h4><i class="fa-solid fa-bullseye"></i>Overview</h4><p>${UI.esc(p.overview)}</p></div>
@@ -61,7 +60,7 @@ const Programmes = (() => {
                         <div class="pd-section"><h4><i class="fa-solid fa-briefcase"></i>Career opportunities</h4><div class="tag-list">${p.careers.map((c) => `<span class="chip">${UI.esc(c)}</span>`).join("")}</div></div>
                         <div class="pd-section"><h4><i class="fa-regular fa-calendar"></i>Training schedule & cohort</h4>
                             <ul class="checklist">${p.schedules.map((x) => `<li>${UI.esc(x)}</li>`).join("")}</ul>
-                            <p class="small muted mt-2 mb-0">Intake: <b>${UI.esc(set.intake || "October 2026 Cohort")}</b> · Classes begin <b>${UI.dateLong(set.cohortDate || TSCE_FLYER.startDate)}</b> · Lead instructor: <b>${UI.esc(p.instructor)}</b></p>
+                            <p class="small muted mt-2 mb-0">Intake: <b>${UI.esc(set.intake || "—")}</b> · Classes begin <b>${UI.dateLong(Site.day(set.cohortDate))}</b>${p.instructor ? ` · Lead instructor: <b>${UI.esc(p.instructor)}</b>` : ""}</p>
                         </div>
                         <div class="seat-meter"><div style="flex:1"><div class="flex between small mb-1"><b>${s.enrolled} enrolled</b><span class="muted">${s.available} seats left</span></div><div class="progress ${s.pct > 85 ? "gold" : ""}"><span data-value="${s.pct}"></span></div></div></div>
                     </div>

@@ -20,6 +20,24 @@ cd backend
 - In development, Django serves `frontend/` too, so there's one server and one origin. In production, nginx serves `frontend/` and proxies `/api/` and `/admin/` to gunicorn.
 - Configuration comes from `backend/.env`. Copy `backend/.env.example` to create it. Dev works without a `.env`; production requires one.
 - The frontend talks to the backend only through `frontend/js/api.js`, which handles the CSRF token, JSON or multipart bodies, and the error shape `{ error, code, fields }`.
+- **Seed the school data** (settings, current cohort, 11 programmes): `python manage.py seed_school`
+
+### Payments (Zainpay)
+
+- `PAYMENT_GATEWAY=simulator` (the default in development) replaces Zainpay's hosted checkout with a local page where you choose *Pay*, *Decline* or *Cancel*. No keys are needed and no money moves. Production refuses to start with the simulator unless `ALLOW_PAYMENT_SIMULATOR=true` (demo servers only).
+- `PAYMENT_GATEWAY=zainpay` with `ZAINPAY_ENVIRONMENT=sandbox|live` and the keys in `backend/.env` (see `.env.example`). Register `https://<domain>/api/payments/zainpay/webhook` as the webhook URL in the Zainpay dashboard.
+- Run `python manage.py reconcile_payments` from cron every 5 minutes. It confirms payments whose callback and webhook were both missed.
+- The flow and the hard-won details of Zainpay's API (two success shapes, ambiguous "Txn not found") are documented at the top of `backend/apps/payments/gateways.py`.
+
+### Browser tests
+
+End-to-end tests drive a real browser (headless Edge by default) against a dev server on a throwaway database in `.e2e/work/`:
+
+```bash
+python -m venv .e2e/venv && .e2e/venv/Scripts/pip install -r e2e/requirements.txt   # once
+bash e2e/run.sh            # all suites
+bash e2e/run.sh payments   # one suite: e2e/setup_payments.py + e2e/test_payments.py
+```
 
 ---
 

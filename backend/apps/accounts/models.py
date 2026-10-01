@@ -47,6 +47,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     # Access to the Django admin back office (not the same as the staff portal).
     is_staff = models.BooleanField(default=False)
+    # Set when an admin resets the password; the portal then forces a change.
+    must_change_password = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
 
     objects = UserManager()

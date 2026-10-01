@@ -1,6 +1,6 @@
 /* ==========================================================================
    TSCE — App bootstrap
-   Public layout (announcement bar, header, footer, demo mode, "Explore
+   Public layout (announcement bar, header, footer, "
    Platform" presentation mode), public page controllers and the router
    that mounts portal pages. Each HTML page declares:
      <body data-root="../" data-page="programmes" [data-portal="staff"]>
@@ -14,7 +14,8 @@ const App = (() => {
     ];
 
     function countdownText() {
-        const target = new Date(`${TSCE_FLYER.startDate}T08:00:00`);
+        if (!Site.cohortDate) return "";
+        const target = new Date(`${Site.cohortDate}T08:00:00`);
         const ms = target - Date.now();
         if (ms <= 0) return "Classes are in session";
         const d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24;
@@ -26,7 +27,7 @@ const App = (() => {
         const eb = Discounts.earlyBirdOpen();
         const bar = `<div class="announce-bar" role="region" aria-label="Announcement"><div class="container">
             <span class="pill">${eb ? "Early bird" : "Enrolling"}</span>
-            <span><strong>${TSCE_FLYER.campaign}</strong> <span class="hide-sm">— classes start Monday, 12th October 2026${eb ? " · 15% off when you pay before 1 October" : ""}.</span></span>
+            <span><strong>${TSCE_FLYER.campaign}</strong> <span class="hide-sm">${Site.cohortDate ? `— classes start ${UI.dateLong(Site.day(Site.cohortDate))}` : ""}${eb ? ` · ${Discounts.RULES.earlybird.pct}% off when you pay before ${UI.date(Discounts.deadline(), { day: "numeric", month: "long" })}` : ""}.</span></span>
             <span class="countdown hide-sm"><i class="fa-regular fa-clock"></i> <span id="abCount">${countdownText()}</span></span>
             <a href="${r}pages/application.html">Apply now →</a></div></div>`;
         const isActive = (href) => (href === "index.html" && page === "home") || (href.includes(page + ".html") && !href.includes("#"));
@@ -89,58 +90,7 @@ const App = (() => {
         </div></footer>`;
     }
 
-    /* Demo mode indicator + "Explore Platform" presentation launcher */
-    function demoChrome() {
-        if (document.body.dataset.nodemo !== undefined) return;
-        const chip = document.createElement("div");
-        chip.className = "demo-chip no-print";
-        chip.innerHTML = `<span class="dot"></span>DEMO MODE <button id="demoLogins">Demo logins</button>`;
-        document.body.appendChild(chip);
-        UI.$("#demoLogins").onclick = explore;
-        // Keep the floating launcher off form flows so it never covers primary actions.
-        if (["application", "payment"].includes(document.body.dataset.page)) return;
-        const fab = document.createElement("button");
-        fab.className = "explore-fab no-print";
-        fab.innerHTML = `<span class="ic"><i class="fa-solid fa-compass"></i></span>Explore Platform`;
-        fab.onclick = explore;
-        document.body.appendChild(fab);
-    }
-
-    function explore() {
-        const r = UI.root();
-        const steps = [
-            ["Beautiful homepage", "Campaign, programmes, scholarships & timeline", `${r}index.html`, "fa-house"],
-            ["Programme catalogue", "11 programmes with curriculum & live seats", `${r}pages/programmes.html?id=fullstack`, "fa-layer-group"],
-            ["Application", "Multi-step wizard with discount engine", `${r}pages/application.html?programme=fullstack`, "fa-file-signature"],
-            ["Payment (Zainpay)", "Simulated checkout → receipt → account activation", null, "fa-bolt"],
-            ["Student dashboard", "Progress, attendance, results, certificate", "demo:student", "fa-user-graduate"],
-            ["Staff dashboard", "Analytics, admissions, payments, reports", "demo:staff", "fa-chart-pie"]
-        ];
-        const m = UI.modal({
-            title: "Explore the TSCE Digital Platform", subtitle: "From first visit to certification — follow the story in order.", size: "lg",
-            body: `<div class="tour-list">${steps.map(([t, d, h, i], k) => `<button class="tour-item" data-go="${h || ""}" ${h ? "" : 'data-pay="1"'}><span class="n">${k + 1}</span><span class="icon-tile"><i class="fa-solid ${i}"></i></span><div><strong>${t}</strong><span>${d}</span></div><i class="fa-solid fa-arrow-right"></i></button>`).join("")}</div>
-                <div class="divider"></div>
-                <h4 class="mb-1">Demo credentials</h4>
-                <div class="demo-creds">
-                    <div class="cred-card"><strong>Student Demo</strong><span class="mono">amina.yusuf@example.com</span><span class="mono">student123</span><button class="btn btn-sm btn-primary mt-1" data-demo="student">Enter Demo</button></div>
-                    <div class="cred-card"><strong>Staff Demo (Admin)</strong><span class="mono">admin@tsce.edu.ng</span><span class="mono">admin123</span><button class="btn btn-sm btn-dark mt-1" data-demo="staff">Enter Demo</button></div>
-                </div>
-                <p class="hint mt-2"><i class="fa-solid fa-circle-info"></i> All data is simulated and stored in this browser. Payments are processed by a Zainpay <b>simulator</b> — no real money moves. Reset any time from Staff → Settings → Demo data.</p>`
-        });
-        UI.$$("[data-go]", m.el).forEach((b) => b.onclick = () => {
-            if (b.dataset.pay) {
-                const pending = DB.first("applications", (a) => a.paymentStatus !== "Paid" && a.status === "Pending");
-                location.href = pending ? `${r}pages/payment.html?app=${encodeURIComponent(pending.id)}` : `${r}pages/application.html`;
-                return;
-            }
-            const g = b.dataset.go;
-            if (g.startsWith("demo:")) { Auth.demo(g.slice(5)); return; }
-            location.href = g;
-        });
-        UI.$$("[data-demo]", m.el).forEach((b) => b.onclick = () => Auth.demo(b.dataset.demo));
-    }
-
-    return { header, footer, demoChrome, explore };
+    return { header, footer };
 })();
 
 /* ---------------- Public: Home ---------------- */
@@ -150,11 +100,10 @@ Pages["home"] = function () {
     UI.$("#featuredProgs").innerHTML = featured.map(Programmes.card).join("");
     Programmes.bindCards(UI.$("#featuredProgs"));
 
-    // Testimonials
-    UI.$("#testimonials").innerHTML = SeedData.testimonials.map((t) => `<figure class="testi reveal" style="margin:0"><div class="stars" aria-label="5 stars">★★★★★</div><blockquote>“${UI.esc(t.quote)}”</blockquote><figcaption class="who">${UI.avatar(t.name)}<div><strong>${UI.esc(t.name)}</strong><span>${UI.esc(t.role)} · Demo testimonial</span></div></figcaption></figure>`).join("");
+    // Testimonials: hidden until TSCE supplies real ones (the demo quotes were invented).
 
     // Countdown
-    const target = new Date(`${TSCE_FLYER.startDate}T08:00:00`);
+    const target = new Date(`${Site.cohortDate || TSCE_FLYER.startDate}T08:00:00`);
     const tick = () => {
         const ms = Math.max(0, target - Date.now());
         const v = [Math.floor(ms / 864e5), Math.floor(ms / 36e5) % 24, Math.floor(ms / 6e4) % 60, Math.floor(ms / 1e3) % 60];
@@ -191,7 +140,7 @@ Pages["admissions"] = function () {
     if (ex) {
         const p = Programmes.get("fullstack"), f = Discounts.compute(p.fee, { applyEarlyBird: true });
         ex.innerHTML = `<div class="fee-box"><div class="fee-head"><strong style="font-family:var(--font-head)">Example: ${UI.esc(p.name)}</strong>${eb ? UI.badge("Early bird active") : UI.badge("Closed")}</div>
-            <div class="fee-row"><span>Programme Fee</span><span>${UI.naira(f.fee)}</span></div><div class="fee-row"><span>Early Bird Discount (15%)</span><span class="neg">−${UI.naira(f.discount)}</span></div><div class="fee-row total"><span>Amount Payable</span><span>${UI.naira(f.payable)}</span></div></div>`;
+            <div class="fee-row"><span>Programme Fee</span><span>${UI.naira(f.fee)}</span></div><div class="fee-row"><span>Early Bird Discount (${f.pct}%)</span><span class="neg">−${UI.naira(f.discount)}</span></div><div class="fee-row total"><span>Amount Payable</span><span>${UI.naira(f.payable)}</span></div></div>`;
     }
     UI.$("#feeTable").innerHTML = Programmes.active().map((p) => `<tr><td><div class="person"><span class="icon-tile" style="width:34px;height:34px;border-radius:10px;background:${p.color};color:#fff;font-size:.8rem"><i class="fa-solid ${p.icon}"></i></span><strong>${UI.esc(p.name)}</strong></div></td><td>${p.weeks} Weeks</td><td class="num"><b>${UI.naira(p.fee)}</b></td><td class="num" style="color:var(--success);font-weight:700">${UI.naira(p.fee * .85)}</td><td class="num">${UI.naira(p.fee * .5)}</td><td><a class="btn btn-xs btn-soft" href="application.html?programme=${p.id}">Apply</a></td></tr>`).join("");
     faq();
@@ -206,10 +155,14 @@ Pages["contact"] = function () {
         if (!UI.validate(f)) return;
         const btn = UI.$("button[type=submit]", f);
         btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Sending…`;
-        await UI.sleep(800);
         const d = UI.formData(f);
-        DB.insert("enquiries", { id: "ENQ-" + Date.now().toString(36), ...d, createdAt: new Date().toISOString() });
-        Notifications.push("staff", "New enquiry", `${d.name}: ${d.subject || d.programme || "General enquiry"}`, "support");
+        try {
+            await API.post("enquiries", { name: d.name, email: d.email, phone: d.phone || "", programme: d.programme || "", subject: d.subject || "", message: d.message });
+        } catch (err) {
+            btn.disabled = false; btn.innerHTML = `Send message <i class="fa-solid fa-paper-plane"></i>`;
+            if (!API.showFieldErrors(f, err)) UI.toast("Message not sent", err.message, "error");
+            return;
+        }
         f.reset();
         btn.disabled = false; btn.innerHTML = `Send message <i class="fa-solid fa-paper-plane"></i>`;
         UI.modal({ size: "sm", bare: true, body: `<div class="processing"><div class="success-mark"><svg viewBox="0 0 52 52"><path d="M14 27l8 8 16-17"/></svg></div><h3>Message sent</h3><p class="muted">Thank you, ${UI.esc(d.name.split(" ")[0])}. Our admissions team will reply within 24 hours.</p><button class="btn btn-primary" data-close>Close</button></div>` });
@@ -218,8 +171,10 @@ Pages["contact"] = function () {
 };
 
 /* ---------------- Router ---------------- */
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     const body = document.body;
+    // Who is signed in + settings and programmes, cached for synchronous use.
+    await Promise.all([Auth.load(), Site.load()]);
     const page = body.dataset.page;
     UI.$$("[data-brand]").forEach((el) => el.outerHTML = UI.brand(UI.url("index.html")));
     const portal = body.dataset.portal;
@@ -231,7 +186,13 @@ document.addEventListener("DOMContentLoaded", () => {
         let ctx = { session };
         if (portal === "student") {
             const student = DB.get("students", session.studentId) || DB.first("students", (s) => s.email === session.email);
-            if (!student) { Auth.logout(); return; }
+            if (!student) {
+                // TRANSITION (until Phase 7): student pages still read demo data from localStorage.
+                Dashboard.mount(portal, page, session);
+                UI.$("#view").innerHTML = UI.empty({ icon: "fa-person-digging", title: "Your student portal is almost ready", text: "We're connecting your programme, attendance and results. Your account and payment are safe — check back soon." });
+                if (session.mustChangePassword) Auth.forcePasswordChange();
+                return;
+            }
             ctx.student = student;
         }
         if (portal === "staff" && ["staff-settings", "staff-staff"].includes(page) && session.role !== "admin") {
@@ -240,6 +201,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         Dashboard.mount(portal, page, session);
+        if (session.mustChangePassword) Auth.forcePasswordChange();
         const view = UI.$("#view");
         const run = Pages[page];
         if (run) UI.safe(() => run(view, ctx), page);
@@ -249,7 +211,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (UI.$("#site-header")) App.header(page);
     App.footer();
-    App.demoChrome();
+    if (!Site.ready) UI.toast("Connection problem", "We couldn't load the latest programme information. Check your connection and reload.", "warning", 8000);
     const run = Pages[page];
     if (run) UI.safe(run, page);
 });

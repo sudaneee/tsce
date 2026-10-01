@@ -19,8 +19,7 @@
 <main id="main">
 <section class="page-hero" style="padding:40px 0 32px"><div class="container">
     <nav class="crumbs" aria-label="Breadcrumb"><a href="../index.html">Home</a><i class="fa-solid fa-chevron-right"></i><a href="admissions.html">Admissions</a><i class="fa-solid fa-chevron-right"></i><span>Application</span></nav>
-    <div class="flex between flex-wrap"><div><h1 style="font-size:clamp(1.7rem,3vw,2.4rem);margin-bottom:6px">Online application</h1><p class="muted mb-0">October 2026 Cohort · takes about 5 minutes · your progress is saved automatically</p></div>
-    <button type="button" class="btn btn-soft" id="autofill"><i class="fa-solid fa-wand-magic-sparkles"></i> Autofill demo applicant</button></div>
+    <div class="flex between flex-wrap"><div><h1 style="font-size:clamp(1.7rem,3vw,2.4rem);margin-bottom:6px">Online application</h1><p class="muted mb-0">October 2026 Cohort · takes about 5 minutes · your progress is saved automatically</p></div></div>
 </div></section>
 <section class="section" style="padding-top:36px"><div class="container" id="wizardRoot">
     <div class="wizard-wrap">
@@ -59,7 +58,7 @@
                         <div class="field"><label for="a_waec">WAEC / NECO status <span class="req">*</span></label><select id="a_waec" name="waecStatus" class="select" required><option value="">Select</option><option>Available</option><option>Awaiting Result</option><option>Not Applicable</option></select></div>
                         <div class="field waec-dep hidden"><label for="a_waecYear">Exam year <span class="req">*</span></label><input id="a_waecYear" name="waecYear" type="number" min="1990" max="2026" class="input" data-req="1" placeholder="e.g. 2022"></div>
                         <div class="field waec-dep hidden"><label for="a_numAs">Number of A's <span class="req">*</span></label><input id="a_numAs" name="numAs" type="number" min="0" max="9" class="input" data-req="1" placeholder="0–9"></div>
-                        <div class="field span-2 waec-dep hidden"><label>Upload result (placeholder)</label><div class="upload-box" id="uploadBox" tabindex="0" role="button" aria-label="Upload WAEC/NECO result"><i class="fa-solid fa-cloud-arrow-up"></i><div><b>Click to upload</b> or drag &amp; drop</div><div class="hint">PDF, JPG or PNG · max 5MB (simulated — file stays on your device)</div></div><input type="file" id="a_file" accept=".pdf,.jpg,.jpeg,.png" hidden><input type="hidden" id="a_resultFile" name="resultFile"></div>
+                        <div class="field span-2 waec-dep hidden"><label>Upload result <span class="muted small">(optional — speeds up Excellence Award review)</span></label><div class="upload-box" id="uploadBox" tabindex="0" role="button" aria-label="Upload WAEC/NECO result"><i class="fa-solid fa-cloud-arrow-up"></i><div><b>Click to upload</b> or drag &amp; drop</div><div class="hint">PDF, JPG or PNG · max 5 MB</div></div><input type="file" id="a_file" accept=".pdf,.jpg,.jpeg,.png" hidden></div>
                         <div class="span-2" id="excHint"></div>
                     </div>
                 </div>

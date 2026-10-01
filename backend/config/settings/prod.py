@@ -1,6 +1,8 @@
 """Production (VPS behind nginx). All secrets come from backend/.env."""
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *  # noqa: F401,F403
-from .base import env
+from .base import PAYMENT_GATEWAY, env
 
 DEBUG = False
 SECRET_KEY = env("DJANGO_SECRET_KEY")
@@ -19,3 +21,8 @@ CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = env.int("DJANGO_HSTS_SECONDS", default=3600)
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
+
+# The simulator approves any payment you ask it to — on a real site that is free
+# enrolment. Only a demo/staging server may opt in explicitly.
+if PAYMENT_GATEWAY == "simulator" and not env.bool("ALLOW_PAYMENT_SIMULATOR", default=False):
+    raise ImproperlyConfigured("PAYMENT_GATEWAY=simulator in production. Use zainpay, or set ALLOW_PAYMENT_SIMULATOR=true on a demo server.")

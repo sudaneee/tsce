@@ -2,6 +2,9 @@
 Every API error has the same JSON shape, which js/api.js relies on:
 
     {"error": "Human-readable message", "code": "machine_code", "fields": {"email": ["…"]}}
+
+A ServiceError may add an "extra" object with data the UI can act on
+(e.g. the number of an existing application to continue with).
 """
 import logging
 
@@ -14,6 +17,20 @@ from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
 logger = logging.getLogger(__name__)
+
+
+class ServiceError(exceptions.APIException):
+    """A business-rule failure raised by a service (400 unless stated)."""
+
+    status_code = status.HTTP_400_BAD_REQUEST
+    default_code = "invalid"
+
+    def __init__(self, message, code="invalid", *, field=None, extra=None, status_code=None):
+        super().__init__(message, code)
+        self.field = field
+        self.extra = extra or {}
+        if status_code:
+            self.status_code = status_code
 
 
 def _messages(detail):
@@ -59,4 +76,9 @@ def api_exception_handler(exc, context):
             code = codes
 
     response.data = {"error": message, "code": code, "fields": fields}
+    if isinstance(exc, ServiceError):
+        if exc.field:
+            response.data["fields"] = {exc.field: [message]}
+        if exc.extra:
+            response.data["extra"] = exc.extra
     return response

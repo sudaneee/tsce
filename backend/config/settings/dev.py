@@ -16,3 +16,9 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.BrowsableAPIRenderer",
     ],
 }
+
+# Tests: a fast hasher (the real one is deliberately slow, ~1s per login).
+import sys  # noqa: E402
+
+if "test" in sys.argv:
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

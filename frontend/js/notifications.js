@@ -114,9 +114,12 @@ Pages["student-announcements"] = function (view) {
 };
 
 /* ---------------- Public: News & Events ---------------- */
-Pages["news"] = function () {
+Pages["news"] = async function () {
     const grads = ["linear-gradient(135deg,#1846D6,#06C8E0)", "linear-gradient(135deg,#0B1D55,#1846D6)", "linear-gradient(135deg,#F5B400,#F97316)", "linear-gradient(135deg,#12A150,#0EA5E9)", "linear-gradient(135deg,#7C3AED,#1846D6)"];
-    const list = Announcements.all().filter((a) => a.status === "Published" && (a.audience === "Public" || a.audience === "All"));
+    UI.$("#newsGrid").innerHTML = UI.skeleton(3);
+    let list = [];
+    try { list = await API.get("announcements/public"); }
+    catch (e) { UI.toast("Couldn't load news", e.message, "warning"); }
     const events = [
         { d: "1", m: "Oct", t: "Registration Opens", s: "Online applications & payments via Zainpay" },
         { d: "3–7", m: "Oct", t: "Intake Exams & Interviews", s: "For Performance Scholarship candidates" },
@@ -126,6 +129,7 @@ Pages["news"] = function () {
     UI.$("#newsGrid").innerHTML = list.map((a, i) => `<article class="news-card card-hover reveal"><div class="news-thumb" style="background:${grads[i % grads.length]}"><i class="fa-solid ${Announcements.iconFor(a.tag).replace("fa-calendar-star", "fa-calendar-days")}" style="position:relative;z-index:1"></i></div>
         <div class="news-body"><div class="news-meta"><span class="badge badge-primary no-dot">${UI.esc(a.tag)}</span><span>${UI.date(a.createdAt)}</span></div><h3>${UI.esc(a.title)}</h3><p>${UI.esc(a.body)}</p><button class="link-btn" data-read="${a.id}">Read more <i class="fa-solid fa-arrow-right"></i></button></div></article>`).join("") || UI.empty({ icon: "fa-newspaper", title: "No news yet" });
     UI.$("#eventList").innerHTML = events.map((e) => `<div class="tl-item reveal"><div class="tl-date"><b>${e.d}</b><small>${e.m}</small></div><div><h4>${e.t}</h4><p>${e.s}</p></div></div>`).join("");
-    UI.$$("[data-read]").forEach((b) => b.onclick = () => { const a = DB.get("announcements", b.dataset.read); UI.modal({ title: UI.esc(a.title), subtitle: `${UI.date(a.createdAt)} · ${UI.esc(a.author)}`, body: `<p>${UI.esc(a.body)}</p>`, footer: `<a class="btn btn-primary" href="application.html">Apply now</a>` }); });
+    if (!list.length) UI.$("#newsGrid").innerHTML = `<div style="grid-column:1/-1">${UI.empty({ icon: "fa-newspaper", title: "No news yet", text: "Announcements from TSCE will appear here." })}</div>`;
+    UI.$$("[data-read]").forEach((b) => b.onclick = () => { const a = list.find((x) => String(x.id) === b.dataset.read); UI.modal({ title: UI.esc(a.title), subtitle: `${UI.date(a.createdAt)} · ${UI.esc(a.author)}`, body: `<p>${UI.esc(a.body)}</p>`, footer: `<a class="btn btn-primary" href="application.html">Apply now</a>` }); });
     UI.animateAll();
 };

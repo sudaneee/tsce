@@ -90,7 +90,6 @@ const Dashboard = (() => {
             <div class="tb-title"><h1>${t}</h1><p>${sub}</p></div>
             ${portal === "staff" ? `<div class="tb-search" id="tbSearch"><i class="fa-solid fa-magnifying-glass"></i><input class="input" id="gSearch" type="search" placeholder="Search students, applications, payments…" aria-label="Global search" autocomplete="off"><kbd>Ctrl K</kbd><div class="search-results" id="gResults" role="listbox"></div></div>` : `<span style="margin-left:auto"></span>`}
             <div class="tb-actions">
-                <span class="demo-pill" title="All data is simulated">Demo mode</span>
                 ${portal === "staff" ? `<button class="tb-btn" id="mSearchBtn" aria-label="Search" style="display:none"><i class="fa-solid fa-magnifying-glass"></i></button>` : ""}
                 <div class="dropdown" id="bellDD"><button class="tb-btn" id="bellBtn" aria-label="Notifications" aria-haspopup="true"><i class="fa-regular fa-bell"></i><span class="dotcount" id="bellCount" hidden></span></button>
                     <div class="dropdown-menu" role="menu"><div class="dm-head"><h4>Notifications</h4><button class="link-btn small" id="bellReadAll">Mark all read</button></div><div class="dm-list" id="bellList"></div><div class="dm-foot"><a class="small" href="${portal === "student" ? "announcements.html" : "announcements.html"}">View all</a></div></div></div>
@@ -98,7 +97,7 @@ const Dashboard = (() => {
                     <div class="dropdown-menu" style="width:240px" role="menu"><div class="menu-list">
                         ${portal === "student" ? `<a href="profile.html"><i class="fa-regular fa-user"></i>My profile</a><a href="settings.html"><i class="fa-solid fa-gear"></i>Settings</a>` : `<a href="dashboard.html"><i class="fa-solid fa-gauge-high"></i>Dashboard</a>${s.role === "admin" ? `<a href="settings.html"><i class="fa-solid fa-gear"></i>Settings</a>` : ""}`}
                         <a href="../../index.html" target="_blank" rel="noopener"><i class="fa-solid fa-globe"></i>View public website</a>
-                        <button id="umTour"><i class="fa-solid fa-compass"></i>Explore platform</button>
+                        <button id="umPassword"><i class="fa-solid fa-key"></i>Change password</button>
                         <button id="umLogout"><i class="fa-solid fa-arrow-right-from-bracket"></i>Log out</button></div></div></div>
             </div>`;
     }
@@ -165,6 +164,26 @@ const Dashboard = (() => {
         mBtn.onclick = () => { UI.$("#tbSearch").classList.add("m-open"); input.focus(); };
     }
 
+    function changePasswordModal() {
+        const m = UI.modal({
+            title: "Change password", size: "sm",
+            body: `<form id="cpForm" class="form-grid" novalidate style="grid-template-columns:1fr">
+                <div class="field"><label for="cp0">Current password <span class="req">*</span></label><input id="cp0" name="currentPassword" type="password" class="input" required autocomplete="current-password"></div>
+                <div class="field"><label for="cp1">New password <span class="req">*</span></label><input id="cp1" name="newPassword" type="password" class="input" required minlength="8" autocomplete="new-password"></div>
+                <div class="field"><label for="cp2">Confirm new password <span class="req">*</span></label><input id="cp2" type="password" class="input" required data-match="cp1" autocomplete="new-password"></div></form>`,
+            footer: `<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="cpSave">Update password</button>`
+        });
+        const f = UI.$("#cpForm", m.el);
+        UI.liveValidate(f);
+        UI.$("#cpSave", m.el).onclick = async () => {
+            if (!UI.validate(f)) return;
+            try {
+                await Auth.changePassword(UI.$("#cp0", m.el).value, UI.$("#cp1", m.el).value);
+                m.close(); UI.toast("Password updated", "Use your new password next time you sign in.", "success");
+            } catch (err) { if (!API.showFieldErrors(f, err)) UI.toast("Couldn't update password", err.message, "error"); }
+        };
+    }
+
     function mount(portal, page, s) {
         const shell = UI.$(".app-shell");
         UI.$("#sidebar").innerHTML = sidebarHTML(portal, page, s);
@@ -177,7 +196,7 @@ const Dashboard = (() => {
         shell.addEventListener("click", (e) => { if (shell.classList.contains("sb-open") && !e.target.closest(".sidebar") && !e.target.closest("#tbMenu")) shell.classList.remove("sb-open"); });
         const logout = async () => { if (await UI.confirm({ title: "Log out?", message: "You'll need to sign in again to access the portal.", confirmText: "Log out", icon: "fa-arrow-right-from-bracket" })) Auth.logout(); };
         UI.$("#sbLogout").onclick = logout; UI.$("#umLogout").onclick = logout;
-        UI.$("#umTour").onclick = () => App.explore();
+        UI.$("#umPassword").onclick = () => changePasswordModal();
         // Dropdowns
         UI.$$(".dropdown").forEach((dd) => {
             const btn = dd.querySelector("button");

@@ -9,29 +9,37 @@
      • Scholarship ≤40% — performance at intake exam/interview (staff assigns)
    Discounts do NOT stack: the single highest approved discount applies. */
 const Discounts = (() => {
-    const RULES = {
-        earlybird: { id: "earlybird", name: "Early Bird Discount", pct: TSCE_FLYER.discounts.earlybird, icon: "fa-bolt", condition: "Payment before 1 October 2026", mode: "automatic" },
-        excellence: { id: "excellence", name: "Excellence Award", pct: TSCE_FLYER.discounts.excellence, icon: "fa-award", condition: "WAEC results from 2020 to date with 5 A's or more", mode: "verification" },
-        scholarship: { id: "scholarship", name: "Performance Scholarship", pct: TSCE_FLYER.discounts.scholarshipMax, upTo: true, icon: "fa-graduation-cap", condition: "Excellent performance during intake examination / interview", mode: "assessment" }
-    };
-    const deadline = () => new Date((DB.settings().admissions?.earlyBirdDeadline || TSCE_FLYER.earlyBirdDeadline) + "T00:00:00");
-    const earlyBirdOpen = (at = new Date()) => at < deadline();
-    const excellenceEligible = (d) => d.waecStatus === "Available" && +d.waecYear >= 2020 && +d.numAs >= 5;
+    // Percentages, thresholds and the early-bird state come from the server
+    // (Site.settings). The browser clock is never trusted for money.
+    const cfg = () => Site.settings?.discounts || { earlybird: 15, excellence: 50, scholarshipMax: 40, excellenceMinYear: 2020, excellenceMinAs: 5, earlyBirdOpen: false };
+    const deadline = () => Site.day(Site.settings?.admissions?.earlyBirdDeadline);
+    const lastDay = () => { const d = deadline(); if (!d) return null; d.setDate(d.getDate() - 1); return d; };
+    function rules() {
+        const c = cfg();
+        return {
+            earlybird: { id: "earlybird", name: "Early Bird Discount", pct: c.earlybird, icon: "fa-bolt", condition: deadline() ? `Payment before ${UI.dateLong(deadline())}` : "Payment before the early-bird deadline", mode: "automatic" },
+            excellence: { id: "excellence", name: "Excellence Award", pct: c.excellence, icon: "fa-award", condition: `WAEC results from ${c.excellenceMinYear} to date with ${c.excellenceMinAs} A's or more`, mode: "verification" },
+            scholarship: { id: "scholarship", name: "Performance Scholarship", pct: c.scholarshipMax, upTo: true, icon: "fa-graduation-cap", condition: "Excellent performance during intake examination / interview", mode: "assessment" }
+        };
+    }
+    const earlyBirdOpen = () => !!cfg().earlyBirdOpen;
+    const excellenceEligible = (d) => d.waecStatus === "Available" && +d.waecYear >= cfg().excellenceMinYear && +d.numAs >= cfg().excellenceMinAs;
 
     function evaluate(d) {
+        const R = rules(), c = cfg(), eb = earlyBirdOpen(), ex = excellenceEligible(d);
         return [
-            { ...RULES.earlybird, eligible: earlyBirdOpen(), reason: earlyBirdOpen() ? "You qualify — pay before 1 October 2026." : "The early-bird window closed on 30 September 2026." },
-            { ...RULES.excellence, eligible: excellenceEligible(d), reason: excellenceEligible(d) ? `WAEC ${d.waecYear} with ${d.numAs} A's — eligible, subject to result verification.` : "Requires WAEC (2020 or later) with at least 5 A's." },
-            { ...RULES.scholarship, eligible: true, reason: "Open to all applicants — sit the intake exam/interview to be assessed." }
+            { ...R.earlybird, eligible: eb, reason: eb ? `You qualify — pay before ${UI.dateLong(deadline())}.` : lastDay() ? `The early-bird window closed on ${UI.dateLong(lastDay())}.` : "The early-bird offer has closed." },
+            { ...R.excellence, eligible: ex, reason: ex ? `WAEC ${d.waecYear} with ${d.numAs} A's — eligible, subject to result verification.` : `Requires WAEC (${c.excellenceMinYear} or later) with at least ${c.excellenceMinAs} A's.` },
+            { ...R.scholarship, eligible: true, reason: "Open to all applicants — sit the intake exam/interview to be assessed." }
         ];
     }
-    /** Amount payable now: only automatic discounts apply at checkout. */
+    /** Amount payable now: only automatic discounts apply at checkout (the server re-checks). */
     function compute(fee, { applyEarlyBird = earlyBirdOpen() } = {}) {
-        const pct = applyEarlyBird ? RULES.earlybird.pct : 0;
+        const pct = applyEarlyBird ? cfg().earlybird : 0;
         const discount = Math.round(fee * pct / 100);
         return { fee, type: pct ? "earlybird" : null, pct, discount, payable: fee - discount };
     }
-    return { RULES, evaluate, compute, earlyBirdOpen, excellenceEligible, deadline };
+    return { get RULES() { return rules(); }, evaluate, compute, earlyBirdOpen, excellenceEligible, deadline };
 })();
 
 const Applications = (() => {
@@ -231,29 +239,56 @@ const Applications = (() => {
 Pages["application"] = function () {
     const STATES = ["Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"];
     const LGAS = { Kaduna: ["Zaria", "Sabon Gari", "Giwa", "Igabi", "Kaduna North", "Kaduna South", "Chikun", "Soba", "Makarfi", "Kudan", "Ikara", "Kubau"], Kano: ["Nassarawa", "Fagge", "Tarauni", "Gwale", "Dala", "Kano Municipal"], Katsina: ["Katsina", "Funtua", "Daura", "Malumfashi"], FCT: ["AMAC", "Bwari", "Gwagwalada", "Kuje"], Sokoto: ["Sokoto North", "Sokoto South", "Wamakko"], Zamfara: ["Gusau", "Kaura Namoda"], Niger: ["Minna", "Bida", "Suleja"], Plateau: ["Jos North", "Jos South"], Bauchi: ["Bauchi", "Azare"], Lagos: ["Ikeja", "Eti-Osa", "Surulere", "Alimosho"] };
-    const set = DB.settings().admissions || {};
+    const MAX_FILE = 5 * 1024 * 1024;
+    const adm = Site.settings?.admissions;
+    const user = Auth.current();
     const form = UI.$("#appForm");
     const panels = UI.$$(".wpanel", form);
     const stepEls = UI.$$(".wstep");
     let step = 0;
     let programmeId = UI.param("programme") || null;
+    let waecFile = null;                 // the File object; can't be saved in a draft
     const TOTAL = panels.length;
 
-    if (set.acceptingApplications === false) {
-        UI.$("#wizardRoot").innerHTML = `<div class="card">${UI.empty({ icon: "fa-door-closed", title: "Applications are currently closed", text: "Admissions for this intake are closed. Please check back for the next cohort.", action: `<a class="btn btn-primary" href="contact.html">Contact admissions</a>` })}</div>`;
+    if (!Site.ready) {
+        UI.$("#wizardRoot").innerHTML = `<div class="card">${UI.empty({ icon: "fa-plug-circle-xmark", title: "We couldn't reach the TSCE server", text: "Check your internet connection and reload the page.", action: `<button class="btn btn-primary" onclick="location.reload()">Reload</button>` })}</div>`;
+        return;
+    }
+    if (!adm.open) {
+        UI.$("#wizardRoot").innerHTML = `<div class="card">${UI.empty({ icon: "fa-door-closed", title: "Applications are currently closed", text: UI.esc(adm.closedMessage), action: `<a class="btn btn-primary" href="contact.html">Contact admissions</a>` })}</div>`;
+        return;
+    }
+    if (user && ["staff", "admin"].includes(user.role)) {
+        UI.$("#wizardRoot").innerHTML = `<div class="card">${UI.empty({ icon: "fa-id-badge", title: "You're signed in with a staff account", text: "Staff accounts can't apply. Sign out to apply with a personal email.", action: `<button class="btn btn-primary" onclick="Auth.logout()">Sign out</button>` })}</div>`;
         return;
     }
 
+    // Drafts live in sessionStorage: they survive a reload but not closing the tab,
+    // so personal details aren't left behind on shared (e.g. cybercafé) computers.
+    const drafts = {
+        get() { try { return JSON.parse(sessionStorage.getItem("tsce_appDraft")); } catch (e) { return null; } },
+        set(v) { try { sessionStorage.setItem("tsce_appDraft", JSON.stringify(v)); } catch (e) { /* ignore */ } },
+        clear() { try { sessionStorage.removeItem("tsce_appDraft"); } catch (e) { /* ignore */ } }
+    };
+
     // Populate selects
-    UI.$("#a_state").innerHTML = `<option value="">Select state</option>` + STATES.map((s) => `<option ${s === "Kaduna" ? "" : ""}>${s}</option>`).join("");
+    UI.$("#a_state").innerHTML = `<option value="">Select state</option>` + STATES.map((s) => `<option>${s}</option>`).join("");
     UI.$("#a_state").addEventListener("change", () => { UI.$("#lgaList").innerHTML = (LGAS[UI.$("#a_state").value] || []).map((l) => `<option value="${l}">`).join(""); });
-    UI.$("#a_intake").innerHTML = `<option value="${UI.esc(set.intake || "October 2026 Cohort")}">${UI.esc(set.intake || "October 2026 Cohort")} — starts ${UI.date(set.cohortDate || TSCE_FLYER.startDate)}</option><option value="January 2027 Cohort">January 2027 Cohort — dates TBC</option>`;
+    UI.$("#a_intake").innerHTML = `<option value="${UI.esc(adm.intake)}">${UI.esc(adm.intake)} — starts ${UI.date(Site.day(adm.cohortDate))}</option>`;
+
+    // Signed-in applicants apply as themselves: email fixed, no password needed.
+    if (user) {
+        UI.$("#a_email").value = user.email;
+        UI.$("#a_email").readOnly = true;
+        UI.$("#a_email").closest(".field").querySelector(".hint").textContent = `Signed in as ${user.email}.`;
+        UI.$$("#a_password, #a_password2").forEach((i) => { i.required = false; i.closest(".field").classList.add("hidden"); });
+    }
 
     // Programme picker
     function renderProgrammes() {
         UI.$("#progPicker").innerHTML = Programmes.active().map((p) => {
             const s = Programmes.seats(p);
-            return `<button type="button" class="prog-option ${p.id === programmeId ? "selected" : ""} ${s.available === 0 ? "disabled" : ""}" data-pid="${p.id}" style="--pc:${p.color}" aria-pressed="${p.id === programmeId}">
+            return `<button type="button" class="prog-option ${p.id === programmeId ? "selected" : ""} ${s.available === 0 ? "disabled" : ""}" data-pid="${p.id}" style="--pc:${p.color}" aria-pressed="${p.id === programmeId}" ${s.available === 0 ? "disabled" : ""}>
                 <span class="icon-tile"><i class="fa-solid ${p.icon}"></i></span><div><strong>${UI.esc(p.name)}</strong><small>${p.weeks} weeks · ${s.available ? s.available + " seats left" : "Full"}</small></div><span class="po-fee">${UI.naira(p.fee)}</span></button>`;
         }).join("");
         UI.$$(".prog-option").forEach((b) => b.addEventListener("click", () => { programmeId = b.dataset.pid; renderProgrammes(); updateProgrammeSummary(); saveDraft(); UI.fieldError(UI.$("#a_programme"), ""); }));
@@ -263,8 +298,8 @@ Pages["application"] = function () {
         UI.$("#a_programme").value = programmeId || "";
         const sched = UI.$("#a_schedule");
         const current = sched.value;
-        sched.innerHTML = `<option value="">Select schedule</option>` + (p ? p.schedules.map((x) => `<option ${x === current ? "selected" : ""}>${x}</option>`).join("") : "");
-        UI.$("#progFee").innerHTML = p ? `<div class="fee-box"><div class="fee-head"><div class="flex"><span class="icon-tile" style="background:${p.color};color:#fff;width:40px;height:40px"><i class="fa-solid ${p.icon}"></i></span><div><strong style="font-family:var(--font-head)">${UI.esc(p.name)}</strong><div class="small muted">${p.weeks} weeks · ${p.modules.length} modules · ${UI.esc(p.instructor)}</div></div></div><button type="button" class="link-btn small" id="viewProg">Details</button></div>
+        sched.innerHTML = `<option value="">Select schedule</option>` + (p ? p.schedules.map((x) => `<option ${x === current ? "selected" : ""}>${UI.esc(x)}</option>`).join("") : "");
+        UI.$("#progFee").innerHTML = p ? `<div class="fee-box"><div class="fee-head"><div class="flex"><span class="icon-tile" style="background:${p.color};color:#fff;width:40px;height:40px"><i class="fa-solid ${p.icon}"></i></span><div><strong style="font-family:var(--font-head)">${UI.esc(p.name)}</strong><div class="small muted">${p.weeks} weeks · ${p.modules.length} modules${p.instructor ? " · " + UI.esc(p.instructor) : ""}</div></div></div><button type="button" class="link-btn small" id="viewProg">Details</button></div>
             <div class="fee-row total"><span>Programme Fee</span><span>${UI.naira(p.fee)}</span></div></div>` : `<div class="alert"><i class="fa-solid fa-hand-pointer"></i><p>Select a programme to see the fee.</p></div>`;
         UI.$("#viewProg")?.addEventListener("click", () => Programmes.openDetail(p.id));
     }
@@ -274,62 +309,49 @@ Pages["application"] = function () {
         const avail = UI.$("#a_waec").value === "Available";
         UI.$$(".waec-dep").forEach((e) => { e.classList.toggle("hidden", !avail); UI.$$("input", e).forEach((i) => i.required = avail && i.dataset.req === "1"); });
         const d = { waecStatus: UI.$("#a_waec").value, waecYear: UI.$("#a_waecYear").value, numAs: UI.$("#a_numAs").value };
-        UI.$("#excHint").innerHTML = Discounts.excellenceEligible(d) ? `<div class="alert success"><i class="fa-solid fa-award"></i><p><b>Great news!</b> Your WAEC result may qualify you for the <b>50% Excellence Award</b>. You can request it on the review step.</p></div>` : "";
+        UI.$("#excHint").innerHTML = Discounts.excellenceEligible(d) ? `<div class="alert success"><i class="fa-solid fa-award"></i><p><b>Great news!</b> Your WAEC result may qualify you for the <b>${Discounts.RULES.excellence.pct}% Excellence Award</b>. You can request it on the review step.</p></div>` : "";
     }
     ["#a_waec", "#a_waecYear", "#a_numAs"].forEach((s) => UI.$(s).addEventListener("input", waecUI));
 
-    // Upload placeholder
+    // Result upload (sent with the application; checked again on the server)
     const up = UI.$("#uploadBox"), file = UI.$("#a_file");
+    const upIdle = up.innerHTML;
     up.addEventListener("click", () => file.click());
     up.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } });
     ["dragover", "dragenter"].forEach((ev) => up.addEventListener(ev, (e) => { e.preventDefault(); up.classList.add("dragover"); }));
-    ["dragleave", "drop"].forEach((ev) => up.addEventListener(ev, (e) => { e.preventDefault(); up.classList.remove("dragover"); if (ev === "drop" && e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0].name); }));
-    file.addEventListener("change", () => file.files[0] && setFile(file.files[0].name));
-    function setFile(name) {
+    ["dragleave", "drop"].forEach((ev) => up.addEventListener(ev, (e) => { e.preventDefault(); up.classList.remove("dragover"); if (ev === "drop" && e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); }));
+    file.addEventListener("change", () => file.files[0] && setFile(file.files[0]));
+    function setFile(f) {
+        const ok = /\.(pdf|jpe?g|png)$/i.test(f.name);
+        if (!ok || f.size > MAX_FILE) {
+            waecFile = null; up.classList.remove("done"); up.innerHTML = upIdle;
+            UI.toast("File not accepted", ok ? "The file is larger than 5 MB." : "Upload a PDF, JPG or PNG file.", "warning");
+            return;
+        }
+        waecFile = f;
         up.classList.add("done");
-        up.innerHTML = `<i class="fa-solid fa-file-circle-check"></i><div><b>${UI.esc(name)}</b></div><div class="hint">Uploaded (simulated) — click to replace</div>`;
-        UI.$("#a_resultFile").value = name; saveDraft();
+        up.innerHTML = `<i class="fa-solid fa-file-circle-check"></i><div><b>${UI.esc(f.name)}</b></div><div class="hint">${(f.size / 1024 / 1024).toFixed(1)} MB · click to replace</div>`;
     }
 
     // Password strength
     UI.$("#a_password").addEventListener("input", (e) => {
         const v = e.target.value; let sc = 0;
-        if (v.length >= 6) sc++; if (/[A-Z]/.test(v) && /[a-z]/.test(v)) sc++; if (/\d/.test(v)) sc++; if (/[^A-Za-z0-9]/.test(v) || v.length >= 10) sc++;
+        if (v.length >= 8) sc++; if (/[A-Z]/.test(v) && /[a-z]/.test(v)) sc++; if (/\d/.test(v)) sc++; if (/[^A-Za-z0-9]/.test(v) || v.length >= 12) sc++;
         UI.$$(".pw-meter span").forEach((s, i) => s.style.background = i < sc ? ["#DC2F45", "#F5B400", "#0EA5E9", "#12A150"][sc - 1] : "");
     });
 
-    // Draft autosave
+    // Draft autosave (never the password or the file)
     function data() { return { ...UI.formData(form), programmeId }; }
-    function saveDraft() { const d = data(); delete d.password; delete d.password2; DB.temp.set("appDraft", { ...d, step }); UI.$("#draftNote").textContent = "Draft saved " + new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); }
+    function saveDraft() { const d = data(); delete d.password; delete d.password2; drafts.set({ ...d, step }); UI.$("#draftNote").textContent = "Draft saved " + new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); }
     function loadDraft() {
-        const d = DB.temp.get("appDraft");
+        const d = drafts.get();
         if (!d) return;
-        Object.entries(d).forEach(([k, v]) => { const el = form.elements[k]; if (!el || k === "step") return; if (el instanceof RadioNodeList) { UI.$$(`input[name="${k}"]`, form).forEach((r) => r.checked = r.value === v); } else el.value = v; });
+        Object.entries(d).forEach(([k, v]) => { const el = form.elements[k]; if (!el || k === "step" || (k === "email" && user)) return; if (el instanceof RadioNodeList) { UI.$$(`input[name="${k}"]`, form).forEach((r) => r.checked = r.value === v); } else if (el.type !== "file") el.value = v; });
         if (!programmeId && d.programmeId) programmeId = d.programmeId;
         UI.$("#a_state").dispatchEvent(new Event("change"));
-        if (d.resultFile) setFile(d.resultFile);
         UI.$("#draftNote").textContent = "Draft restored";
     }
     form.addEventListener("input", UI.debounce(saveDraft, 500));
-
-    // Demo autofill
-    UI.$("#autofill").addEventListener("click", () => {
-        const pool = [["Abubakar", "Tanimu", "Male"], ["Aisha", "Garba", "Female"], ["Sulaiman", "Idris", "Male"], ["Maryam", "Lawal", "Female"], ["Yahaya", "Bello", "Male"], ["Fatima", "Sulaiman", "Female"]];
-        const [f, l, g] = pool[Math.floor(Math.random() * pool.length)];
-        const tag = Math.floor(100 + Math.random() * 900);
-        const vals = { firstName: f, middleName: "", lastName: l, gender: g, dob: "2002-05-14", phone: "0803 " + tag + " 4521", email: `${f}.${l}${tag}@example.com`.toLowerCase(), address: "12 Samaru Road, Zaria", state: "Kaduna", lga: "Zaria", qualification: "OND", institution: "Nuhu Bamalli Polytechnic, Zaria", gradYear: "2023", waecStatus: "Available", waecYear: "2019", numAs: "3", intake: UI.$("#a_intake").options[0].value };
-        Object.entries(vals).forEach(([k, v]) => { if (form.elements[k]) form.elements[k].value = v; });
-        UI.$("#a_state").dispatchEvent(new Event("change"));
-        if (!programmeId) programmeId = "fullstack";
-        renderProgrammes(); updateProgrammeSummary();
-        UI.$("#a_schedule").value = Programmes.get(programmeId).schedules[0];
-        UI.$("#a_password").value = "student123"; UI.$("#a_password2").value = "student123";
-        UI.$("#a_password").dispatchEvent(new Event("input"));
-        UI.$("#a_declare").checked = true;
-        waecUI(); saveDraft();
-        UI.$$(".field.has-error", form).forEach((f) => f.classList.remove("has-error"));
-        UI.toast("Demo applicant filled", `${f} ${l} — portal password: student123`, "success");
-    });
 
     // Review step
     function renderReview() {
@@ -347,12 +369,12 @@ Pages["application"] = function () {
 
         UI.$("#feeCalc").innerHTML = `<div class="fee-box"><div class="fee-head"><strong style="font-family:var(--font-head)">Fee calculation</strong><span class="badge badge-primary no-dot">${UI.esc(d.intake)}</span></div>
             <div class="fee-row"><span>Programme Fee</span><span>${UI.naira(fees.fee)}</span></div>
-            ${fees.discount ? `<div class="fee-row"><span>Early Bird Discount (15%)</span><span class="neg">−${UI.naira(fees.discount)}</span></div>` : `<div class="fee-row"><span>Discount</span><span class="muted">—</span></div>`}
+            ${fees.discount ? `<div class="fee-row"><span>Early Bird Discount (${fees.pct}%)</span><span class="neg">−${UI.naira(fees.discount)}</span></div>` : `<div class="fee-row"><span>Discount</span><span class="muted">—</span></div>`}
             <div class="fee-row total"><span>Amount Payable</span><span>${UI.naira(fees.payable)}</span></div></div>
             <p class="hint mt-1"><i class="fa-solid fa-circle-info"></i> Discounts don't stack. If an Excellence Award or Scholarship is approved, it replaces the early-bird discount and the difference is refunded.</p>`;
 
         const r = (k, v) => `<div><small>${k}</small><strong>${UI.esc(v || "—")}</strong></div>`;
-        UI.$("#reviewGrid").innerHTML = r("Full name", [d.firstName, d.middleName, d.lastName].filter(Boolean).join(" ")) + r("Email", d.email) + r("Phone", d.phone) + r("Gender · DOB", `${d.gender} · ${UI.date(d.dob)}`) + r("State · LGA", `${d.state} · ${d.lga}`) + r("Qualification", `${d.qualification} — ${d.institution}`) + r("WAEC/NECO", d.waecStatus === "Available" ? `${d.waecYear} · ${d.numAs} A's` : d.waecStatus) + r("Programme", p.name) + r("Schedule", d.schedule) + r("Intake", d.intake);
+        UI.$("#reviewGrid").innerHTML = r("Full name", [d.firstName, d.middleName, d.lastName].filter(Boolean).join(" ")) + r("Email", d.email) + r("Phone", d.phone) + r("Gender · DOB", `${d.gender} · ${UI.date(d.dob)}`) + r("State · LGA", `${d.state} · ${d.lga}`) + r("Qualification", `${d.qualification} — ${d.institution}`) + r("WAEC/NECO", d.waecStatus === "Available" ? `${d.waecYear} · ${d.numAs} A's${waecFile ? " · result attached" : ""}` : d.waecStatus) + r("Programme", p.name) + r("Schedule", d.schedule) + r("Intake", d.intake);
         UI.$("#payBtnAmt").textContent = UI.naira(fees.payable);
         UI.$$('input[name="awardRequest"]').forEach((i) => i.addEventListener("change", saveDraft));
     }
@@ -376,11 +398,6 @@ Pages["application"] = function () {
     }
     function validStep() {
         if (step === 2 && !programmeId) { UI.fieldError(UI.$("#a_programme"), "Please select a programme."); UI.toast("Select a programme", "Choose the programme you want to apply for.", "warning"); return false; }
-        if (step === 0) {
-            const email = UI.$("#a_email").value.trim().toLowerCase();
-            const u = DB.first("users", (x) => x.email === email);
-            if (u && u.role !== "applicant") { UI.fieldError(UI.$("#a_email"), "An account with this email already exists. Sign in or use a different email."); UI.$("#a_email").focus(); return false; }
-        }
         return UI.validate(panels[step]);
     }
     UI.$("#nextBtn").addEventListener("click", () => { if (validStep()) go(step + 1); });
@@ -389,25 +406,57 @@ Pages["application"] = function () {
     UI.$$("[data-goto]").forEach((b) => b.addEventListener("click", () => go(+b.dataset.goto)));
     UI.liveValidate(form);
 
+    /** Server field errors → highlight them and jump to the first step that has one. */
+    function showServerErrors(err) {
+        const fields = Object.keys(err.fields || {});
+        API.showFieldErrors(form, err);
+        if (err.fields?.programmeId) UI.fieldError(UI.$("#a_programme"), [].concat(err.fields.programmeId)[0]);
+        if (err.fields?.resultFile) UI.toast("WAEC result upload", [].concat(err.fields.resultFile)[0], "warning");
+        const stepOf = (name) => panels.findIndex((p) => name === "programmeId" ? p.contains(UI.$("#a_programme")) : name === "resultFile" ? p.contains(up) : p.querySelector(`[name="${CSS.escape(name)}"]`));
+        const first = fields.map(stepOf).filter((i) => i >= 0).sort((a, b) => a - b)[0];
+        if (first !== undefined && first !== step) go(first);
+    }
+
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
         if (!validStep()) return;
         const btn = UI.$("#submitBtn");
-        btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Creating invoice…`;
-        await UI.sleep(700);
-        UI.safe(() => {
-            const app = Applications.create(data());
-            DB.temp.clear("appDraft");
-            DB.temp.set("lastApp", app.id);
-            UI.toast("Application saved", `${app.id} — proceeding to secure payment`, "success");
-            setTimeout(() => location.href = `payment.html?app=${encodeURIComponent(app.id)}`, 500);
-        }, "create application");
+        btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Submitting application…`;
+        const d = data();
+        const fd = new FormData();
+        ["firstName", "middleName", "lastName", "gender", "dob", "phone", "email", "address", "state", "lga", "qualification", "institution", "gradYear", "waecStatus", "waecYear", "numAs", "schedule"].forEach((k) => fd.append(k, d[k] ?? ""));
+        fd.append("programmeId", programmeId);
+        fd.append("awardRequest", d.awardRequest || "none");
+        if (!user) fd.append("password", UI.$("#a_password").value);
+        fd.append("declare", UI.$("#a_declare").checked ? "true" : "false");
+        if (waecFile && d.waecStatus === "Available") fd.append("resultFile", waecFile);
+        try {
+            const res = await API.post("applications", fd);
+            drafts.clear();
+            UI.toast("Application submitted", `${res.application.id} — proceeding to secure payment`, "success");
+            setTimeout(() => location.href = `payment.html?app=${encodeURIComponent(res.application.id)}`, 500);
+            return;
+        } catch (err) {
+            if (err.code === "duplicate_application") {
+                const no = err.data?.extra?.applicationId;
+                UI.modal({
+                    title: "You've already applied", size: "sm", body: `<p>${UI.esc(err.message)}</p><p class="muted small">Sign in with the same email to continue, or pay for your existing application.</p>`,
+                    footer: `<button class="btn btn-ghost" data-close>Close</button><a class="btn btn-primary" href="payment.html?app=${encodeURIComponent(no || "")}">Continue to payment</a>`
+                });
+            } else if (Object.keys(err.fields || {}).length) {
+                showServerErrors(err);
+                UI.toast("Please check your application", err.message, "warning");
+            } else {
+                UI.toast("Couldn't submit application", err.message, "error");
+            }
+        }
         btn.disabled = false; btn.innerHTML = `Proceed to Payment · <span id="payBtnAmt"></span>`;
+        if (step === TOTAL - 1) renderReview();
     });
 
     loadDraft();
     waecUI();
-    const d0 = DB.temp.get("appDraft");
+    const d0 = drafts.get();
     if (UI.param("programme")) programmeId = UI.param("programme");
     let startAt = !UI.param("programme") && d0?.step ? d0.step : 0;
     if (startAt >= 2 && !programmeId) startAt = 2;

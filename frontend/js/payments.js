@@ -119,7 +119,9 @@ const Payments = (() => {
 
     function receiptHTML(p) {
         const prog = Programmes.get(p.programmeId);
-        const set = DB.settings().institution || {};
+        const inst = Site.settings?.institution || {};
+        const set = { name: inst.name, address: inst.address, phone: (inst.phones || []).join(", "), website: inst.website };
+        const env = Site.settings?.payments?.environment;
         return `<div class="receipt">
             <div class="receipt-head"><div class="flex">${UI.logoFull("receipt-logo")}<div><h3>${UI.esc(set.name || TSCE_FLYER.name)}</h3><p>${UI.esc(set.address || TSCE_FLYER.address)}</p><p>${UI.esc(set.phone || "")} · ${UI.esc(set.website || "")}</p></div></div>
             <div style="text-align:right"><h3>PAYMENT RECEIPT</h3><p>${UI.dateTime(p.verifiedAt || p.createdAt)}</p></div></div>
@@ -131,17 +133,19 @@ const Payments = (() => {
                 ${p.studentId ? `<tr><td>Student ID</td><td class="mono">${UI.esc(p.studentId)}</td></tr>` : ""}
                 <tr><td>Description</td><td>${UI.esc(p.description || (prog ? prog.name : "Payment"))}</td></tr>
                 ${p.fee && p.fee !== p.amount ? `<tr><td>Programme fee</td><td>${UI.naira(p.fee)}</td></tr><tr><td>Discount applied</td><td style="color:var(--success)">−${UI.naira(p.discount || p.fee - p.amount)}</td></tr>` : ""}
-                <tr><td>Payment gateway</td><td>Zainpay · ${CHANNEL[p.channel] || "Card"}</td></tr>
+                <tr><td>Payment gateway</td><td>Zainpay${CHANNEL[p.channel] ? " · " + CHANNEL[p.channel] : ""}</td></tr>
                 <tr><td>Status</td><td>${p.status}</td></tr>
                 <tr class="r-total"><td>Amount paid</td><td>${UI.naira(p.amount)}</td></tr>
             </table>
             ${p.status === "SUCCESS" ? `<span class="stamp">PAID · VERIFIED</span>` : p.status === "REFUNDED" ? `<span class="stamp" style="border-color:var(--info);color:var(--info)">REFUNDED</span>` : ""}
-            <p class="small muted mt-3 mb-0">This is a system-generated receipt from the TSCE Digital Platform (demo mode — no real funds were processed).</p>
+            ${p.kind !== "refund" && Site.settings?.payments?.payerCharge ? `<p class="small muted mt-2 mb-0">The ${UI.naira(Site.settings.payments.payerCharge)} Zainpay transaction charge is paid to the payment provider and is not included above.</p>` : ""}
+            <p class="small muted mt-3 mb-0">This is a system-generated receipt from the TSCE Digital Platform${env && env !== "live" ? ` (${env} payment — no real funds were processed)` : ""}.</p>
         </div>`;
     }
 
+    /** ref: a payment object from the API, or (legacy demo pages) a localStorage reference. */
     function showReceipt(ref) {
-        const p = DB.get("payments", ref);
+        const p = typeof ref === "object" ? ref : DB.get("payments", ref);
         if (!p) return UI.toast("Receipt not found", "", "error");
         const m = UI.modal({
             title: "Payment receipt", subtitle: UI.esc(p.ref), size: "lg", body: receiptHTML(p),
@@ -196,68 +200,73 @@ const Payments = (() => {
 })();
 
 /* ---------------- Public: Payment page (Zainpay checkout) ---------------- */
-Pages["payment"] = function () {
-    const appId = UI.param("app") || DB.temp.get("lastApp");
-    const app = appId && DB.get("applications", appId);
+Pages["payment"] = async function () {
     const wrap = UI.$("#payRoot");
-    if (!app) {
-        wrap.innerHTML = `<div class="card">${UI.empty({ icon: "fa-file-invoice", title: "No pending application found", text: "Start an application to generate an invoice and pay securely with Zainpay.", action: `<a class="btn btn-primary" href="application.html">Start application</a>` })}</div>`;
+    const number = UI.param("app"), result = UI.param("result"), lastRef = UI.param("ref");
+    const user = Auth.current();
+    const pset = Site.settings?.payments || {};
+    const card = (opts) => `<div class="card">${UI.empty(opts)}</div>`;
+
+    if (result === "unknown") {
+        wrap.innerHTML = card({ icon: "fa-circle-question", title: "We couldn't match that payment", text: "If you completed a payment, sign in and open your application — its status updates within a few minutes. Contact TSCE if it doesn't.", action: `<a class="btn btn-primary" href="login.html?role=student">Sign in</a>` });
+        return;
+    }
+    if (!user) {
+        wrap.innerHTML = card({ icon: "fa-right-to-bracket", title: "Sign in to pay", text: "Sign in with the email and password you used when applying. You'll come straight back to your invoice.", action: `<a class="btn btn-primary" href="login.html?role=student">Sign in</a> <a class="btn btn-ghost" href="application.html">Start an application</a>` });
+        return;
+    }
+    const appNo = number || user.applicationId;
+    if (!appNo) {
+        wrap.innerHTML = card({ icon: "fa-file-invoice", title: "No application to pay for", text: "Start an application to generate an invoice and pay securely with Zainpay.", action: `<a class="btn btn-primary" href="application.html">Start application</a>` });
+        return;
+    }
+
+    wrap.innerHTML = `<div class="card">${UI.skeleton(5)}</div>`;
+    let app;
+    try { app = await API.get("applications/" + encodeURIComponent(appNo)); }
+    catch (e) {
+        wrap.innerHTML = card({ icon: "fa-file-circle-xmark", title: e.status === 404 ? "Application not found" : "Couldn't load your invoice", text: e.status === 404 ? `We couldn't find ${UI.esc(appNo)} on the account you're signed in with (${UI.esc(user.email)}).` : UI.esc(e.message), action: `<a class="btn btn-primary" href="application.html">Start application</a>` });
         return;
     }
     if (app.paymentStatus === "Paid") {
-        wrap.innerHTML = `<div class="card">${UI.empty({ icon: "fa-circle-check", title: "This application has already been paid", text: `Application ${UI.esc(app.id)} was paid on ${UI.date(app.paidAt)}.`, action: `<a class="btn btn-primary" href="success.html?app=${encodeURIComponent(app.id)}">View confirmation</a>` })}</div>`;
+        wrap.innerHTML = card({ icon: "fa-circle-check", title: "This application has already been paid", text: `Application ${UI.esc(app.id)} was paid on ${UI.date(app.paidAt)}.`, action: `<a class="btn btn-primary" href="success.html?ref=${encodeURIComponent(app.txRef || "")}">View confirmation</a>` });
         return;
     }
-    const prog = Programmes.get(app.programmeId);
-    const pset = DB.settings().payments || {};
-    let channel = "card";
+    if (app.status === "Rejected") {
+        wrap.innerHTML = card({ icon: "fa-circle-xmark", title: "This application was not successful", text: "It can no longer be paid. Contact the admissions office if you have questions.", action: `<a class="btn btn-primary" href="contact.html">Contact admissions</a>` });
+        return;
+    }
+
+    const prog = Programmes.get(app.programmeId) || { name: app.programmeName, weeks: "", color: "#1846D6", icon: "fa-layer-group" };
+    const env = pset.environment;
+    const charge = pset.payerCharge || 0, total = app.amountPayable + charge;
+    const methods = [pset.allowCard !== false && ["fa-regular fa-credit-card", "Card", "Visa, Mastercard, Verve"], pset.allowTransfer !== false && ["fa-solid fa-building-columns", "Bank transfer", "Pay from any Nigerian bank app"]].filter(Boolean);
+    const alerts = {
+        failed: `<div class="alert danger mb-2" role="alert"><i class="fa-solid fa-circle-xmark"></i><p><b>Your last payment didn't go through.</b> No money was taken for it. You can try again below, with another card or by bank transfer.</p></div>`,
+        pending: `<div class="alert warning mb-2" id="pendingBox" role="status"><i class="fa-solid fa-hourglass-half"></i><p><b>We're confirming your payment with Zainpay…</b> This usually takes a few seconds, but bank transfers can take a few minutes. <button class="link-btn" id="checkNow">Check now</button></p></div>`
+    };
 
     wrap.innerHTML = `<div class="pay-wrap">
         <div>
+            ${alerts[result] || ""}
             <div class="checkout">
-                <div class="checkout-head"><div class="zp-logo"><span class="zp-mark"><i class="fa-solid fa-bolt"></i></span><div>Zainpay<small>Secure checkout · ${ZainpaySimulator.config.environment}</small></div></div>
-                    <div class="amt"><small>Amount due</small><strong>${UI.naira(app.amountPayable)}</strong></div></div>
-                <div class="pay-methods" role="tablist" aria-label="Payment method">
-                    ${pset.allowCard !== false ? `<button class="pay-method active" data-ch="card" role="tab" aria-selected="true"><i class="fa-regular fa-credit-card"></i>Card</button>` : ""}
-                    ${pset.allowTransfer !== false ? `<button class="pay-method" data-ch="transfer" role="tab" aria-selected="false"><i class="fa-solid fa-building-columns"></i>Bank Transfer</button>` : ""}
-                    ${pset.allowVirtual !== false ? `<button class="pay-method" data-ch="virtual" role="tab" aria-selected="false"><i class="fa-solid fa-wallet"></i>Virtual Account</button>` : ""}
+                <div class="checkout-head"><div class="zp-logo"><span class="zp-mark"><i class="fa-solid fa-bolt"></i></span><div>Zainpay<small>Secure checkout${env && env !== "live" ? " · " + UI.esc(env) : ""}</small></div></div>
+                    <div class="amt"><small>Total to pay</small><strong>${UI.naira(total)}</strong></div></div>
+                <div style="padding:22px 24px 6px">
+                    <p class="small muted mb-2">You'll be taken to Zainpay's secure payment page${methods.length === 1 && methods[0][1] === "Bank transfer" ? " to pay by bank transfer" : ""}, then brought straight back here.${pset.allowCard !== false ? " TSCE never sees or stores your card details." : ""}</p>
+                    <ul class="list">${methods.map(([i, t, d]) => `<li class="list-item"><span class="icon-tile"><i class="${i}"></i></span><div class="grow"><strong>${t}</strong><small>${d}</small></div></li>`).join("")}</ul>
                 </div>
-                <div class="pay-panel active" data-panel="card">
-                    <div class="card-visual"><div class="flex between"><span class="chip-ic"></span><i class="fa-brands fa-cc-visa" style="font-size:1.8rem"></i></div>
-                        <div class="cv-num" id="cvNum">5399 8300 0000 0001</div><div class="cv-row"><span id="cvName">${UI.esc((app.firstName + " " + app.lastName).toUpperCase())}</span><span id="cvExp">12/28</span></div></div>
-                    <form id="cardForm" class="form-grid" novalidate>
-                        <div class="field span-2"><label for="cNum">Card number</label><div class="input-icon"><i class="fa-regular fa-credit-card"></i><input id="cNum" class="input mono" inputmode="numeric" autocomplete="cc-number" value="5399 8300 0000 0001" required minlength="19" maxlength="19"></div><span class="hint">Sandbox: any card works · ending in <b>0002</b> simulates a decline.</span></div>
-                        <div class="field"><label for="cExp">Expiry</label><input id="cExp" class="input mono" placeholder="MM/YY" value="12/28" required maxlength="5" autocomplete="cc-exp"></div>
-                        <div class="field"><label for="cCvv">CVV</label><input id="cCvv" class="input mono" type="password" inputmode="numeric" value="123" required maxlength="4" minlength="3" autocomplete="cc-csc"></div>
-                    </form>
-                </div>
-                <div class="pay-panel" data-panel="transfer">
-                    <p class="small muted">Transfer the exact amount to the Zainpay collection account below. Your payment is confirmed automatically once received.</p>
-                    <div class="bank-box">
-                        <div class="row"><span class="muted">Bank</span><strong>Zainpay MFB (Sandbox)</strong></div>
-                        <div class="row"><span class="muted">Account number</span><span><strong class="mono">9900 184 226</strong><button class="copy-btn" data-copy="9900184226">Copy</button></span></div>
-                        <div class="row"><span class="muted">Account name</span><strong>TSCE Collections</strong></div>
-                        <div class="row"><span class="muted">Amount</span><strong>${UI.naira(app.amountPayable)}</strong></div>
-                        <div class="row"><span class="muted">Narration</span><span><strong class="mono">${UI.esc(app.id)}</strong><button class="copy-btn" data-copy="${UI.esc(app.id)}">Copy</button></span></div>
-                    </div>
-                </div>
-                <div class="pay-panel" data-panel="virtual">
-                    <p class="small muted">Generate a dedicated virtual account for this application. Any transfer into it is matched to your invoice automatically.</p>
-                    <div id="vaBox"><button class="btn btn-soft btn-block" id="genVA"><i class="fa-solid fa-wand-magic-sparkles"></i> Generate virtual account</button></div>
-                </div>
-                <div style="padding:0 24px 22px"><button class="btn btn-grad btn-lg btn-block" id="payNow"><i class="fa-solid fa-lock"></i> Pay ${UI.naira(app.amountPayable)}</button></div>
+                <div style="padding:14px 24px 22px"><button class="btn btn-grad btn-lg btn-block" id="payNow"><i class="fa-solid fa-lock"></i> Pay ${UI.naira(total)} securely</button></div>
                 <div class="pay-secure"><i class="fa-solid fa-shield-halved"></i> Secure payment powered by <b>Zainpay</b> · PCI-DSS compliant · 256-bit encryption</div>
             </div>
-            <div class="sandbox-box no-print"><strong><i class="fa-solid fa-flask"></i> Demo sandbox controls</strong>
-                <div class="flex flex-wrap"><label class="small" for="sbOutcome">Simulate outcome:</label><select id="sbOutcome" class="select" style="height:36px;width:auto"><option value="success">Payment succeeds</option><option value="fail">Payment fails</option></select>
-                <button class="link-btn small" id="howItWorks"><i class="fa-solid fa-diagram-project"></i> How the Zainpay flow works</button></div></div>
+            ${env && env !== "live" ? `<div class="sandbox-box no-print"><strong><i class="fa-solid fa-flask"></i> ${env === "simulated" ? "Simulated payments" : "Zainpay sandbox"}</strong><p class="small mb-0">${env === "simulated" ? "This server uses the built-in payment simulator — no real money moves. You'll choose the outcome on the next page." : "Sandbox mode — use Zainpay's test cards or test transfer details. No real money moves."}</p></div>` : ""}
         </div>
         <aside class="order-summary">
             <div class="card card-pad">
-                <div class="flex between mb-2"><h3 class="mb-0" style="font-size:1.05rem">Order summary</h3>${UI.badge("Pending Payment")}</div>
-                <div class="flex mb-2" style="align-items:flex-start"><span class="icon-tile" style="background:${prog.color};color:#fff"><i class="fa-solid ${prog.icon}"></i></span><div><strong style="font-family:var(--font-head)">${UI.esc(prog.name)}</strong><div class="small muted">${prog.weeks} weeks · ${UI.esc(app.intake)}</div></div></div>
+                <div class="flex between mb-2"><h3 class="mb-0" style="font-size:1.05rem">Order summary</h3>${UI.badge(app.paymentStatus === "Failed" ? "Failed" : "Pending Payment")}</div>
+                <div class="flex mb-2" style="align-items:flex-start"><span class="icon-tile" style="background:${prog.color};color:#fff"><i class="fa-solid ${prog.icon}"></i></span><div><strong style="font-family:var(--font-head)">${UI.esc(app.programmeName)}</strong><div class="small muted">${prog.weeks ? prog.weeks + " weeks · " : ""}${UI.esc(app.intake)}</div></div></div>
                 <div class="bank-box" style="margin-bottom:14px">
-                    <div class="row"><span class="muted">Applicant</span><strong>${UI.esc(app.firstName + " " + app.lastName)}</strong></div>
+                    <div class="row"><span class="muted">Applicant</span><strong>${UI.esc(app.name)}</strong></div>
                     <div class="row"><span class="muted">Application No.</span><strong class="mono" style="font-size:.84rem">${UI.esc(app.id)}</strong></div>
                     <div class="row"><span class="muted">Schedule</span><strong style="font-size:.84rem;text-align:right">${UI.esc(app.schedule)}</strong></div>
                 </div>
@@ -265,133 +274,100 @@ Pages["payment"] = function () {
                     <div class="fee-row"><span>Programme Fee</span><span>${UI.naira(app.fee)}</span></div>
                     ${app.discountAmount ? `<div class="fee-row"><span>${Applications.discountName(app.discountType)} (${app.discountPct}%)</span><span class="neg">−${UI.naira(app.discountAmount)}</span></div>` : ""}
                     <div class="fee-row total"><span>Amount Payable</span><span>${UI.naira(app.amountPayable)}</span></div>
+                    ${charge ? `<div class="fee-row"><span>Zainpay transaction charge</span><span>${UI.naira(charge)}</span></div><div class="fee-row total"><span>Total to pay</span><span>${UI.naira(total)}</span></div>` : ""}
                 </div>
-                ${app.awardRequest ? `<div class="alert mt-2"><i class="fa-solid fa-award"></i><p>Your <b>${Applications.discountName(app.awardRequest)}</b> request will be reviewed by admissions. If approved, the difference is refunded to you.</p></div>` : ""}
+                ${app.awardRequest?.status === "Pending" ? `<div class="alert mt-2"><i class="fa-solid fa-award"></i><p>Your <b>${Applications.discountName(app.awardRequest.type)}</b> request will be reviewed by admissions. If approved, the difference is refunded to you.</p></div>` : ""}
                 <div class="flex mt-2 small muted"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Instant confirmation & e-receipt</div>
                 <div class="flex mt-1 small muted"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Student portal activated after payment</div>
             </div>
         </aside></div>`;
 
-    // Method tabs
-    UI.$$(".pay-method").forEach((b) => b.addEventListener("click", () => {
-        channel = b.dataset.ch;
-        UI.$$(".pay-method").forEach((x) => { x.classList.toggle("active", x === b); x.setAttribute("aria-selected", x === b); });
-        UI.$$(".pay-panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === channel));
-        UI.$("#payNow").innerHTML = channel === "card" ? `<i class="fa-solid fa-lock"></i> Pay ${UI.naira(app.amountPayable)}` : `<i class="fa-solid fa-check-double"></i> I've sent ${UI.naira(app.amountPayable)}`;
-    }));
-    UI.$$("[data-copy]").forEach((b) => b.onclick = () => UI.copy(b.dataset.copy));
-    // Card number formatting + live card preview
-    const cNum = UI.$("#cNum");
-    cNum.addEventListener("input", () => {
-        cNum.value = cNum.value.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
-        UI.$("#cvNum").textContent = cNum.value.padEnd(19, "•");
-    });
-    UI.$("#cExp").addEventListener("input", (e) => { let v = e.target.value.replace(/\D/g, "").slice(0, 4); if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2); e.target.value = v; UI.$("#cvExp").textContent = v; });
-    UI.$("#genVA").onclick = async (e) => {
-        e.target.disabled = true; e.target.innerHTML = `<span class="spinner"></span> Generating…`;
-        const r = await ZainpaySimulator.createVirtualAccount({ name: app.firstName + " " + app.lastName });
-        UI.$("#vaBox").innerHTML = `<div class="bank-box"><div class="row"><span class="muted">Bank</span><strong>${r.data.bankName}</strong></div><div class="row"><span class="muted">Account number</span><span><strong class="mono">${r.data.accountNumber}</strong><button class="copy-btn" data-copy="${r.data.accountNumber}">Copy</button></span></div><div class="row"><span class="muted">Account name</span><strong>${UI.esc(r.data.accountName)}</strong></div><div class="row"><span class="muted">Valid for</span><strong>72 hours</strong></div></div>`;
-        UI.$$("#vaBox [data-copy]").forEach((b) => b.onclick = () => UI.copy(b.dataset.copy));
-        UI.toast("Virtual account created", "Transfer the exact amount to complete payment.", "success");
-    };
-    UI.$("#howItWorks").onclick = () => Pages.showZainpayFlow();
-
-    async function pay() {
-        if (channel === "card" && !UI.validate(UI.$("#cardForm"))) return;
-        const proc = Payments.processingModal();
+    const payBtn = UI.$("#payNow");
+    payBtn.onclick = async () => {
+        payBtn.disabled = true; payBtn.innerHTML = `<span class="spinner"></span> Connecting to Zainpay…`;
         try {
-            const p = await PaymentService.checkout({
-                amount: app.amountPayable, fee: app.fee, discount: app.discountAmount, email: app.email, name: `${app.firstName} ${app.lastName}`,
-                description: `${prog.name} — tuition (${app.intake})`, channel, outcome: UI.$("#sbOutcome").value, card: cNum.value,
-                applicationId: app.id, programmeId: app.programmeId
-            }, (i) => proc.step(i));
-            if (p.status !== "SUCCESS") {
-                Applications.markPaymentFailed(app.id, p);
-                proc.failure("Payment could not be completed. Please try again.", pay);
-                return;
+            const r = await API.post("payments/initialize", { applicationId: app.id });
+            if (r.amount !== app.amountPayable) {
+                const go = await UI.confirm({ title: "Amount updated", message: `The early-bird period has ended, so the amount payable is now <b>${UI.naira(r.amount)}</b>${charge ? ` (plus the ${UI.naira(charge)} Zainpay charge)` : ""}.`, confirmText: `Pay ${UI.naira(r.amount + charge)}`, icon: "fa-circle-info" });
+                if (!go) { location.reload(); return; }
             }
-            Applications.markPaid(app.id, p);
-            DB.temp.set("lastApp", app.id);
-            proc.success(p, {
-                secondary: `<button class="btn btn-outline" id="pmReceipt"><i class="fa-solid fa-receipt"></i> Receipt</button>`,
-                primary: `<a class="btn btn-primary" href="success.html?app=${encodeURIComponent(app.id)}">Continue <i class="fa-solid fa-arrow-right"></i></a>`
-            });
-            UI.$("#pmReceipt", proc.m.el).onclick = () => Payments.showReceipt(p.ref);
+            location.href = r.checkoutUrl;
         } catch (err) {
-            console.error(err);
-            proc.failure("Payment could not be completed. Please try again.", pay);
+            payBtn.disabled = false; payBtn.innerHTML = `<i class="fa-solid fa-lock"></i> Pay ${UI.naira(total)} securely`;
+            UI.toast(err.code === "programme_full" ? "Programme full" : "Payment not started", err.message, "error", 8000);
+            if (err.code === "already_paid") location.reload();
         }
-    }
-    UI.$("#payNow").addEventListener("click", pay);
-};
+    };
 
-/** Visual explanation of the simulated Zainpay flow (for management demos). */
-Pages.showZainpayFlow = function () {
-    const steps = [
-        ["fa-file-signature", "Application", "Applicant completes the online form"],
-        ["fa-file-invoice", "Invoice Created", "Fee and eligible discount calculated"],
-        ["fa-bolt", "Zainpay Checkout", "initializePayment() → transaction reference"],
-        ["fa-spinner", "Processing", "processPayment() — card / transfer / virtual account"],
-        ["fa-circle-check", "Payment Successful", "Gateway approves the transaction"],
-        ["fa-shield-halved", "Transaction Verified", "verifyPayment() confirms amount & status"],
-        ["fa-file-circle-check", "Application Paid", "Status updated, receipt generated"],
-        ["fa-user-graduate", "Student Account Activated", "Portal access + notifications"]
-    ];
-    UI.modal({
-        title: "Simulated Zainpay payment flow", subtitle: "How money moves through the platform", size: "lg",
-        body: `<div class="history">${steps.map(([i, t, d]) => `<li class="ok"><strong><i class="fa-solid ${i}" style="color:var(--primary);width:20px"></i> ${t}</strong><small>${d}</small></li>`).join("")}</div>
-            <div class="alert mt-2"><i class="fa-solid fa-code"></i><p><b>Going live:</b> the browser calls your backend (<span class="mono">/api/payments/initialize</span>, <span class="mono">/api/payments/verify</span>); only the backend holds Zainpay credentials and receives webhooks. The <span class="mono">ZainpaySimulator</span> in <span class="mono">js/payments.js</span> is replaced — no UI changes needed.</p></div>`,
-        footer: `<button class="btn btn-primary" data-close>Got it</button>`
-    });
+    // Back from checkout but not confirmed yet: ask again a few times, then leave it to the cron job.
+    if (result === "pending" && lastRef) {
+        let tries = 0, busy = false;
+        const check = async (manual) => {
+            if (busy) return; busy = true;
+            try {
+                const p = await API.post(`payments/${encodeURIComponent(lastRef)}/check`);
+                if (p.status === "SUCCESS") { location.href = `success.html?ref=${encodeURIComponent(p.ref)}`; return; }
+                if (p.status === "FAILED") { location.href = `payment.html?app=${encodeURIComponent(app.id)}&result=failed`; return; }
+                if (manual) UI.toast("Still processing", "Zainpay hasn't confirmed this payment yet. We'll keep checking.", "info");
+            } catch (e) { if (manual) UI.toast("Couldn't check", e.message, "warning"); }
+            finally { busy = false; }
+        };
+        UI.$("#checkNow").onclick = () => check(true);
+        const timer = setInterval(() => { if (++tries > 10) { clearInterval(timer); UI.$("#pendingBox p").insertAdjacentHTML("beforeend", " <br><span class='small'>If you paid, you don't need to pay again — it will be confirmed automatically and you'll get a notification.</span>"); return; } check(false); }, 5000);
+        check(false);
+    }
 };
 
 /* ---------------- Public: Success page ---------------- */
-Pages["success"] = function () {
-    const appId = UI.param("app") || DB.temp.get("lastApp");
-    const app = appId && DB.get("applications", appId);
+Pages["success"] = async function () {
     const box = UI.$("#successRoot");
-    if (!app || app.paymentStatus !== "Paid") {
-        box.innerHTML = `<div class="card">${UI.empty({ icon: "fa-hourglass-half", title: "No completed application to show", text: "Once your payment is confirmed, your application confirmation appears here.", action: `<a class="btn btn-primary" href="application.html">Start application</a>` })}</div>`;
-        return;
+    const ref = UI.param("ref");
+    const empty = (opts) => box.innerHTML = `<div class="card">${UI.empty(opts)}</div>`;
+    if (!ref) return empty({ icon: "fa-hourglass-half", title: "No completed payment to show", text: "Once your payment is confirmed, your confirmation appears here.", action: `<a class="btn btn-primary" href="application.html">Start application</a>` });
+    if (!Auth.current()) return empty({ icon: "fa-right-to-bracket", title: "Sign in to view your confirmation", text: "For your privacy, payment details are only shown to the account that paid.", action: `<a class="btn btn-primary" href="login.html?role=student">Sign in</a>` });
+
+    box.innerHTML = `<div class="card">${UI.skeleton(6)}</div>`;
+    let pay, app;
+    try {
+        pay = await API.get(`payments/${encodeURIComponent(ref)}`);
+        if (pay.status !== "SUCCESS") { location.replace(`payment.html?app=${encodeURIComponent(pay.applicationId || "")}&ref=${encodeURIComponent(ref)}&result=${pay.status === "FAILED" ? "failed" : "pending"}`); return; }
+        app = await API.get("applications/" + encodeURIComponent(pay.applicationId));
+    } catch (e) {
+        return empty({ icon: "fa-receipt", title: "We couldn't load this confirmation", text: UI.esc(e.message), action: `<a class="btn btn-primary" href="../index.html">Back to home</a>` });
     }
-    const prog = Programmes.get(app.programmeId);
-    const pay = DB.get("payments", app.txRef);
+    const start = Site.day(app.cohortStart);
     box.innerHTML = `<div class="success-card">
         <div class="success-top"><div class="success-mark"><svg viewBox="0 0 52 52"><path d="M14 27l8 8 16-17"/></svg></div>
             <span class="badge badge-success mb-2">Payment verified</span>
             <h1>APPLICATION SUBMITTED SUCCESSFULLY</h1>
-            <p class="muted" style="max-width:560px;margin:0 auto 12px">Thank you, ${UI.esc(app.firstName)}. Your application and payment have been received. Your student portal account is now active.</p>
+            <p class="muted" style="max-width:560px;margin:0 auto 12px">Thank you, ${UI.esc(app.firstName)}. Your application and payment have been received. Your student portal account is now active${pay.studentId ? ` — your student number is <b>${UI.esc(pay.studentId)}</b>` : ""}.</p>
             <div class="app-no"><div><small>Application Number</small><br><strong>${UI.esc(app.id)}</strong></div><button class="icon-btn" id="copyApp" aria-label="Copy application number"><i class="fa-regular fa-copy"></i></button></div>
         </div>
         <div class="success-details">
-            <div><small>Applicant</small><strong>${UI.esc([app.firstName, app.middleName, app.lastName].filter(Boolean).join(" "))}</strong></div>
-            <div><small>Programme</small><strong>${UI.esc(prog.name)}</strong></div>
+            <div><small>Applicant</small><strong>${UI.esc(app.name)}</strong></div>
+            <div><small>Programme</small><strong>${UI.esc(app.programmeName)}</strong></div>
             <div><small>Cohort</small><strong>${UI.esc(app.intake)}</strong></div>
             <div><small>Payment status</small>${UI.badge("Paid")}</div>
-            <div><small>Application status</small>${UI.badge(app.status === "Paid" ? "Submitted" : app.status)}</div>
-            <div><small>Transaction reference</small><strong class="mono" style="font-size:.82rem">${UI.esc(app.txRef)}</strong></div>
-            <div><small>Amount paid</small><strong>${UI.naira(app.amountPayable)}</strong></div>
+            <div><small>Application status</small>${UI.badge(app.status === "Pending" ? "Submitted" : app.status)}</div>
+            <div><small>Transaction reference</small><strong class="mono" style="font-size:.82rem">${UI.esc(pay.ref)}</strong></div>
+            <div><small>Amount paid</small><strong>${UI.naira(pay.amount)}</strong></div>
             <div><small>Discount</small><strong>${app.discountAmount ? `${Applications.discountName(app.discountType)} (−${UI.naira(app.discountAmount)})` : "None"}</strong></div>
-            <div><small>Classes begin</small><strong>${UI.dateLong(DB.settings().admissions?.cohortDate || TSCE_FLYER.startDate)}</strong></div>
+            <div><small>Classes begin</small><strong>${UI.dateLong(start)}</strong></div>
         </div>
         <div class="success-actions no-print">
             <button class="btn btn-outline" id="dlReceipt"><i class="fa-solid fa-download"></i> Download Receipt</button>
             <button class="btn btn-outline" id="printApp"><i class="fa-solid fa-print"></i> Print Application</button>
-            <button class="btn btn-primary" id="goPortal"><i class="fa-solid fa-user-graduate"></i> Go to Student Portal</button>
+            <a class="btn btn-primary" href="student/dashboard.html"><i class="fa-solid fa-user-graduate"></i> Go to Student Portal</a>
         </div></div>
         <div class="next-steps no-print">
-            <div class="card card-pad"><span class="icon-tile"><i class="fa-regular fa-envelope"></i></span><h4 class="mt-2">Check your email</h4><p class="small muted mb-0">A confirmation and receipt were sent to ${UI.esc(app.email)} (simulated).</p></div>
-            <div class="card card-pad"><span class="icon-tile cyan"><i class="fa-solid fa-magnifying-glass"></i></span><h4 class="mt-2">Admission review</h4><p class="small muted mb-0">Admissions will review your application within 48 hours.</p></div>
-            <div class="card card-pad"><span class="icon-tile gold"><i class="fa-solid fa-calendar-check"></i></span><h4 class="mt-2">Orientation</h4><p class="small muted mb-0">Attend orientation before classes start on ${UI.date(TSCE_FLYER.startDate)}.</p></div>
+            <div class="card card-pad"><span class="icon-tile"><i class="fa-solid fa-receipt"></i></span><h4 class="mt-2">Keep your receipt</h4><p class="small muted mb-0">Download it now. It's also available any time in your student portal.</p></div>
+            <div class="card card-pad"><span class="icon-tile cyan"><i class="fa-solid fa-magnifying-glass"></i></span><h4 class="mt-2">Admission review</h4><p class="small muted mb-0">The admissions office will review your application and notify you in your portal.</p></div>
+            <div class="card card-pad"><span class="icon-tile gold"><i class="fa-solid fa-calendar-check"></i></span><h4 class="mt-2">Get ready</h4><p class="small muted mb-0">Classes start on ${UI.date(start)}. Watch your portal for orientation details.</p></div>
         </div>`;
-    UI.confetti();
+    if (UI.param("fresh") !== "0") UI.confetti();
     UI.$("#copyApp").onclick = () => UI.copy(app.id);
-    UI.$("#dlReceipt").onclick = () => pay ? Payments.showReceipt(pay.ref) : UI.toast("Receipt unavailable", "", "error");
+    UI.$("#dlReceipt").onclick = () => Payments.showReceipt(pay);
     UI.$("#printApp").onclick = () => UI.printHTML(`Application ${app.id}`, Applications.printHTML(app));
-    UI.$("#goPortal").onclick = () => {
-        if (Auth.signInAs(app.email)) location.href = "student/dashboard.html";
-        else location.href = "login.html?role=student";
-    };
 };
 
 /* ---------------- Staff: Payment management ---------------- */
@@ -399,7 +375,7 @@ Pages["staff-payments"] = function (view) {
     let statusFilter = UI.param("status") || "";
     view.innerHTML = `
         <div class="view-head"><div><h2>Payments & Transactions</h2><p>All Zainpay transactions — verify pending transfers, issue refunds and print receipts.</p></div>
-            <div class="actions"><button class="btn btn-outline" id="flowBtn"><i class="fa-solid fa-diagram-project"></i> Payment flow</button><button class="btn btn-primary" id="expPay"><i class="fa-solid fa-file-csv"></i> Export CSV</button></div></div>
+            <div class="actions"><button class="btn btn-primary" id="expPay"><i class="fa-solid fa-file-csv"></i> Export CSV</button></div></div>
         <div class="kpis" id="payKpis"></div>
         <div class="dash-grid cols-12" style="margin-bottom:20px">
             <div class="panel span-8"><div class="panel-head"><div><h3><i class="fa-solid fa-chart-column"></i>Daily collections</h3><p>Successful Zainpay payments — last 21 days</p></div></div><div class="panel-body"><div class="chart-box sm"><canvas id="payDaily"></canvas></div></div></div>
@@ -499,7 +475,6 @@ Pages["staff-payments"] = function (view) {
     }
     ["#tSearch", "#tStatus", "#tChannel", "#tProg"].forEach((s) => UI.$(s).addEventListener(s === "#tSearch" ? "input" : "change", UI.debounce(refresh, 120)));
     UI.$("#expPay").onclick = () => UI.downloadCSV("tsce-transactions.csv", Payments.all().map((p) => ({ Reference: p.ref, Student: p.name, Email: p.email, Application: p.applicationId, Programme: Programmes.name(p.programmeId), Amount: p.amount, Gateway: "Zainpay", Channel: Payments.CHANNEL[p.channel], Status: p.status, Date: UI.dateTime(p.createdAt) })));
-    UI.$("#flowBtn").onclick = () => Pages.showZainpayFlow();
     refresh(); charts();
     const open = UI.param("ref"); if (open && DB.get("payments", open)) detail(open);
 };

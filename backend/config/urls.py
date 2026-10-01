@@ -11,7 +11,7 @@ admin.site.index_title = "Back office"
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/", include("apps.core.urls")),
+    path("api/", include("config.api_urls")),
 ]
 
 if settings.SERVE_FRONTEND:
