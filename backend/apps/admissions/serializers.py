@@ -1,10 +1,8 @@
 from datetime import date
 
-from django.contrib.auth import password_validation
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from apps.accounts.models import User
 from apps.core.validators import normalize_ng_phone, validate_document
 from apps.programmes.models import Programme
 
@@ -28,7 +26,11 @@ def _django_errors(fn, *args):
 
 
 class ApplicationCreateSerializer(serializers.Serializer):
-    """The public application form (multipart). Field names match the form inputs."""
+    """
+    The application form (multipart), submitted by a signed-in account. Field
+    names match the form inputs. A parent fills in the child's details; the
+    child's email is optional. Self-applicants apply with their account email.
+    """
 
     # Personal
     firstName = serializers.CharField(max_length=60)
@@ -37,7 +39,7 @@ class ApplicationCreateSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(Application.Gender.choices)
     dob = serializers.DateField()
     phone = serializers.CharField(max_length=30)
-    email = serializers.EmailField(max_length=254)
+    email = serializers.EmailField(max_length=254, required=False, allow_blank=True, default="")
     address = serializers.CharField(max_length=300)
     state = serializers.ChoiceField(STATES)
     lga = serializers.CharField(max_length=80)
@@ -58,10 +60,6 @@ class ApplicationCreateSerializer(serializers.Serializer):
     )
     schedule = serializers.CharField(max_length=80)
     awardRequest = serializers.ChoiceField(["none", *AwardRequest.Type.values], default="none")
-
-    # Account
-    # Required for visitors (creates or unlocks their account); ignored when signed in.
-    password = serializers.CharField(trim_whitespace=False, max_length=128, required=False, allow_blank=True, default="")
     declare = serializers.BooleanField()
 
     def validate_phone(self, value):
@@ -106,19 +104,6 @@ class ApplicationCreateSerializer(serializers.Serializer):
         if attrs["schedule"] not in attrs["programmeId"].schedules:
             errors["schedule"] = "Choose one of the schedules offered for this programme."
 
-        # New accounts must use a strong password. Existing accounts are checked
-        # against their current password in the service instead.
-        request = self.context.get("request")
-        signed_in = bool(request and request.user.is_authenticated)
-        if not signed_in and not attrs["password"]:
-            errors["password"] = "Create a password for your student portal account."
-        elif not signed_in and not User.objects.filter(email__iexact=attrs["email"]).exists():
-            probe = User(email=attrs["email"], full_name=f'{attrs["firstName"]} {attrs["lastName"]}')
-            try:
-                password_validation.validate_password(attrs["password"], probe)
-            except DjangoValidationError as exc:
-                errors["password"] = list(exc.messages)
-
         if errors:
             raise serializers.ValidationError(errors)
         return attrs
@@ -149,6 +134,9 @@ class ApplicationSerializer(serializers.ModelSerializer):
     gradYear = serializers.IntegerField(source="grad_year")
     hasResultFile = serializers.SerializerMethodField()
     txRef = serializers.SerializerMethodField()
+    applicationFee = serializers.IntegerField(source="application_fee")
+    applicationFeePaidAt = serializers.DateTimeField(source="application_fee_paid_at")
+    studentId = serializers.SerializerMethodField()
     awardRequest = serializers.SerializerMethodField()
     history = serializers.SerializerMethodField()
 
@@ -157,23 +145,30 @@ class ApplicationSerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "firstName", "middleName", "lastName", "gender", "dob", "email", "phone", "address", "state",
             "lga", "qualification", "institution", "gradYear", "waecStatus", "waecYear", "numAs", "hasResultFile",
-            "programmeId", "programmeName", "intake", "cohortStart", "schedule", "fee", "discountType", "discountPct",
+            "programmeId", "programmeName", "intake", "cohortStart", "schedule", "applicationFee", "applicationFeePaidAt",
+            "fee", "discountType", "discountPct",
             "discountAmount", "amountPayable", "status", "paymentStatus", "txRef", "createdAt", "paidAt",
-            "awardRequest", "history",
+            "studentId", "awardRequest", "history",
         ]
 
     def get_hasResultFile(self, obj):
         return bool(obj.waec_file)
 
     def get_txRef(self, obj):
-        paid = obj.payments.filter(kind="charge", status="SUCCESS").order_by("verified_at").first()
+        """Reference of the programme-fee payment (the main receipt)."""
+        paid = obj.payments.filter(kind="charge", purpose="programme_fee", status="SUCCESS").order_by("verified_at").first()
         return paid.reference if paid else None
+
+    def get_studentId(self, obj):
+        enrollment = getattr(obj, "enrollment", None)
+        return enrollment.student.student_no if enrollment else None
 
     def get_awardRequest(self, obj):
         award = getattr(obj, "award_request", None)
         if award is None:
             return None
-        return {"type": award.type, "status": award.status, "requestedPct": award.requested_pct, "awardedPct": award.awarded_pct}
+        return {"type": award.type, "status": award.status, "requestedPct": award.requested_pct,
+                "awardedPct": award.awarded_pct, "note": award.note}
 
     def get_history(self, obj):
         return [{"at": e.at, "text": e.text, "ok": e.ok} for e in obj.events.all()]

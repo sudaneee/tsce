@@ -42,11 +42,11 @@ const UI = (() => {
 
     /* ---------- Status badges ---------- */
     const BADGE_MAP = {
-        success: ["paid", "success", "enrolled", "accepted", "approved", "active", "published", "present", "issued", "verified", "completed", "resolved", "eligible", "applied"],
-        warning: ["pending", "under review", "late", "draft", "open", "on leave", "pending payment", "in review", "processing", "requested"],
+        success: ["paid", "success", "enrolled", "admitted", "accepted", "approved", "active", "published", "present", "issued", "verified", "completed", "resolved", "eligible", "applied"],
+        warning: ["pending", "awaiting verification", "under review", "late", "draft", "open", "on leave", "pending payment", "in review", "processing", "requested"],
         danger: ["rejected", "failed", "absent", "inactive", "suspended", "unpaid", "declined", "cancelled", "not eligible"],
         info: ["refunded", "in progress", "submitted", "scheduled"],
-        neutral: ["not issued", "none", "closed", "archived"]
+        neutral: ["not issued", "none", "closed", "archived", "withdrawn"]
     };
     function badge(status, extra = "") {
         const s = String(status || "—");

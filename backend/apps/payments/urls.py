@@ -3,6 +3,8 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path("staff/payments", views.StaffPaymentsView.as_view(), name="staff-payments"),
+    path("staff/payments/<str:ref>/refund", views.StaffRefundView.as_view(), name="staff-payment-refund"),
     path("payments/initialize", views.InitializePaymentView.as_view(), name="payment-initialize"),
     path("payments/zainpay/callback", views.zainpay_callback, name="zainpay-callback"),
     path("payments/zainpay/webhook", views.zainpay_webhook, name="zainpay-webhook"),

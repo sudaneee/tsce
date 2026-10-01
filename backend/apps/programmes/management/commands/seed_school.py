@@ -58,7 +58,6 @@ class Command(BaseCommand):
                 "current_cohort": cohort,
                 "early_bird_pct": flyer["discounts"]["earlybird"],
                 "excellence_pct": flyer["discounts"]["excellence"],
-                "scholarship_max_pct": flyer["discounts"]["scholarshipMax"],
             },
         )
         self.report("Site settings", settings, created)

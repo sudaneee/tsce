@@ -1,7 +1,7 @@
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect
 from rest_framework import serializers, status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -68,3 +68,26 @@ class PublicAnnouncementsView(APIView):
     def get(self, request):
         qs = Announcement.objects.filter(status=Announcement.Status.PUBLISHED, audience=Announcement.Audience.PUBLIC)
         return Response(PublicAnnouncementSerializer(qs[:50], many=True).data)
+
+
+class MyNotificationsView(APIView):
+    """The bell: latest notifications for the signed-in user + unread count."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = Notification.objects.filter(recipient=request.user)
+        rows = [{"id": n.pk, "title": n.title, "body": n.body, "type": n.type, "link": n.link, "read": n.read,
+                 "createdAt": n.created_at} for n in qs[:30]]
+        return Response({"results": rows, "unread": qs.filter(read=False).count()})
+
+
+class MarkNotificationReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk=None):
+        qs = Notification.objects.filter(recipient=request.user, read=False)
+        if pk is not None:
+            qs = qs.filter(pk=pk)
+        qs.update(read=True)
+        return Response({"unread": Notification.objects.filter(recipient=request.user, read=False).count()})

@@ -40,7 +40,7 @@ const Auth = (() => {
     function homeFor(role, s = current()) {
         if (role === "student") return UI.url("pages/student/dashboard.html");
         if (role === "staff" || role === "admin") return UI.url("pages/staff/dashboard.html");
-        if (role === "applicant") return UI.url(`pages/payment.html?app=${encodeURIComponent(s?.applicationId || "")}`);
+        if (role === "applicant" || role === "parent") return UI.url("pages/my-applications.html");
         return UI.url("index.html");
     }
     function loginUrl(portal) {
@@ -153,4 +153,79 @@ Pages["login"] = function () {
             footer: `<button class="btn btn-primary" data-close>OK</button>`
         });
     });
+};
+
+/* ---------------- Register ---------------- */
+Pages["register"] = function () {
+    const f = UI.$("#regForm");
+    const s = Auth.current();
+    if (s) {
+        UI.$("#regRoot").insertAdjacentHTML("afterbegin", `<div class="alert success mt-2"><i class="fa-solid fa-circle-check"></i><p>You're signed in as <b>${UI.esc(s.name)}</b>. <a href="${Auth.homeFor(s.role, s)}">Continue →</a></p></div>`);
+    }
+    const setType = () => {
+        const parent = UI.$('input[name="accountType"]:checked', f).value === "parent";
+        UI.$("#rNameLbl").innerHTML = `${parent ? "Your full name (parent / guardian)" : "Your full name"} <span class="req">*</span>`;
+    };
+    UI.$$('input[name="accountType"]', f).forEach((r) => r.addEventListener("change", setType));
+    setType();
+    UI.liveValidate(f);
+
+    function sent(email) {
+        UI.$("#regRoot").innerHTML = `<a href="../index.html" class="small muted"><i class="fa-solid fa-arrow-left"></i> Back to website</a>
+            <div class="empty"><div class="empty-icon"><i class="fa-solid fa-envelope-circle-check"></i></div>
+            <h3>Check your email</h3><p class="muted">We've sent a verification link to <b>${UI.esc(email)}</b>. Open it to activate your account, then you can apply.</p>
+            <p class="small muted">Can't find it? Check your spam folder, or <button class="link-btn" id="resend">send it again</button>.</p>
+            <a class="btn btn-ghost mt-2" href="login.html?role=student">Go to sign in</a></div>`;
+        UI.$("#resend").onclick = async () => {
+            try { await API.post("auth/resend-verification", { email }); UI.toast("Link sent", `If ${email} still needs verifying, a new link is on its way.`, "success"); }
+            catch (e) { UI.toast("Couldn't resend", e.message, "error"); }
+        };
+    }
+    f.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (!UI.validate(f)) return;
+        const btn = UI.$("button[type=submit]", f);
+        btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Creating account…`;
+        const d = UI.formData(f);
+        try {
+            const r = await API.post("auth/register", { accountType: d.accountType, fullName: d.fullName, email: d.email, phone: d.phone, password: d.password });
+            sent(r.email);
+        } catch (err) {
+            btn.disabled = false; btn.innerHTML = `Create account <i class="fa-solid fa-arrow-right"></i>`;
+            if (!API.showFieldErrors(f, err)) UI.toast("Couldn't create account", err.message, "error");
+        }
+    });
+};
+
+/* ---------------- Verify email (link from the registration email) ---------------- */
+Pages["verify-email"] = async function () {
+    const box = UI.$("#verifyRoot");
+    const back = `<a href="../index.html" class="small muted"><i class="fa-solid fa-arrow-left"></i> Back to website</a>`;
+    function resendForm(message) {
+        box.innerHTML = `${back}<h1 class="mt-3">Verify your email</h1>
+            <div class="alert warning mb-2"><i class="fa-solid fa-triangle-exclamation"></i><p>${UI.esc(message)}</p></div>
+            <form id="rvForm" novalidate><div class="field mb-2"><label for="rvEmail">Email address</label><input id="rvEmail" type="email" class="input" required autocomplete="email"></div>
+            <button class="btn btn-primary btn-block">Send a new link</button></form>
+            <p class="small muted mt-3">Already verified? <a href="login.html?role=student">Sign in</a></p>`;
+        const f = UI.$("#rvForm");
+        f.onsubmit = async (e) => {
+            e.preventDefault(); if (!UI.validate(f)) return;
+            try { await API.post("auth/resend-verification", { email: UI.$("#rvEmail").value }); UI.toast("Link sent", "If that account still needs verifying, a new link is on its way.", "success"); }
+            catch (err) { UI.toast("Couldn't send", err.message, "error"); }
+        };
+    }
+    const token = UI.param("token");
+    if (!token) return resendForm("Open the verification link from your email, or request a new one below.");
+    box.innerHTML = `${back}<div class="empty"><span class="spinner"></span><p class="muted mt-2">Verifying your email…</p></div>`;
+    try {
+        const r = await API.post("auth/verify-email", { token });
+        if (r.alreadyVerified) {
+            box.innerHTML = `${back}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-circle-check"></i></div><h3>Your email is already verified</h3><p class="muted">Sign in to continue.</p><a class="btn btn-primary" href="login.html?role=student">Sign in</a></div>`;
+            return;
+        }
+        box.innerHTML = `${back}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-circle-check"></i></div><h3>Email verified</h3><p class="muted">Welcome, ${UI.esc(r.user.name.split(" ")[0])}! Taking you to your applications…</p></div>`;
+        setTimeout(() => location.replace(Auth.homeFor(r.user.role, r.user)), 1200);
+    } catch (err) {
+        resendForm(err.message);
+    }
 };

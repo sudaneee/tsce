@@ -36,7 +36,7 @@ End-to-end tests drive a real browser (headless Edge by default) against a dev s
 ```bash
 python -m venv .e2e/venv && .e2e/venv/Scripts/pip install -r e2e/requirements.txt   # once
 bash e2e/run.sh            # all suites
-bash e2e/run.sh payments   # one suite: e2e/setup_payments.py + e2e/test_payments.py
+bash e2e/run.sh journey    # one suite: e2e/setup_journey.py + e2e/test_journey.py
 ```
 
 ---

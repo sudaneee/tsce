@@ -1,8 +1,18 @@
 """
-Admissions business rules. Views stay thin and call these; every change of
-state happens inside a transaction and leaves a line in the application history.
+Admissions business rules (revised flow, 1 Oct 2026):
+
+    create_application()        signed-in, email-verified account applies (for self or a child)
+    application_fee_paid()      → admit() automatically, or AWAITING_VERIFICATION for an award request
+    review_award()              staff verify the WAEC result in person → admit() at 50% or full price
+    sync_programme_quote()      re-price the programme fee at checkout (early bird by payment date)
+    programme_fee_paid()        → ENROLLED: Student record, student number, Enrollment, seat taken
+
+Views stay thin and call these; every change of state happens inside a
+transaction and leaves a line in the application history.
 """
+from django.conf import settings as dj_settings
 from django.db import transaction
+from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.comms.models import Notification
@@ -10,45 +20,27 @@ from apps.comms.services import notify, notify_staff
 from apps.core.exceptions import ServiceError
 from apps.core.models import Sequence, SiteSettings
 
-from .discounts import admissions_state, excellence_eligible, quote, seats_taken, today
+from .discounts import admissions_state, excellence_eligible, programme_quote, seats_taken, today
 from .models import Application, ApplicationEvent, AwardRequest
 
+MY_APPLICATIONS = "pages/my-applications.html"
 
-def _resolve_applicant(data, request_user):
-    """
-    Who is applying. Signed-in users apply as themselves. Visitors get a new
-    applicant account, or — if the email already has one — must give its password.
-    """
-    email = data["email"]
-    if request_user and request_user.is_authenticated:
-        if request_user.is_portal_staff:
-            raise ServiceError("Staff accounts can't apply. Sign out and apply with a personal email.", "staff_account")
-        if request_user.email != email:
-            raise ServiceError(
-                f"You're signed in as {request_user.email}. Apply with that email, or sign out first.",
-                "email_mismatch", field="email",
-            )
-        return request_user
 
-    user = User.objects.filter(email__iexact=email).first()
-    if user is None:
-        return User.objects.create_user(
-            email, data["password"], full_name=f'{data["firstName"]} {data["lastName"]}', role=User.Role.APPLICANT
-        )
-    if user.is_portal_staff:
-        raise ServiceError("This email belongs to a TSCE staff account. Please use a personal email.", "staff_account", field="email")
-    if not user.check_password(data["password"]):
-        raise ServiceError(
-            "An account with this email already exists. Enter the password you used before, or sign in first.",
-            "account_exists", field="password",
-        )
-    if not user.is_active:
-        raise ServiceError("This account has been disabled. Contact the TSCE admin office.", "account_disabled", field="email")
-    return user
+def naira(amount):
+    return f"₦{amount:,}"
+
+
+def _event(app, text, ok=False, actor=None):
+    ApplicationEvent.objects.create(application=app, text=text, ok=ok, actor=actor)
 
 
 @transaction.atomic
-def create_application(data, request_user=None) -> Application:
+def create_application(data, user) -> Application:
+    if not user.can_apply:
+        raise ServiceError("Staff accounts can't apply. Sign out and use a student or parent account.", "staff_account")
+    if user.needs_email_verification:
+        raise ServiceError("Please verify your email address before applying.", "email_unverified")
+
     settings = SiteSettings.load()
     state = admissions_state(settings)
     if not state.open:
@@ -60,147 +52,243 @@ def create_application(data, request_user=None) -> Application:
         raise ServiceError(f"{programme.name} is full for the {cohort.name}. Please choose another programme.",
                            "programme_full", field="programmeId")
 
-    award_type = data["awardRequest"] if data["awardRequest"] != "none" else ""
-    eligible = excellence_eligible(settings, data["waecStatus"], data["waecYear"], data["numAs"])
-    if award_type == AwardRequest.Type.EXCELLENCE and not eligible:
+    wants_award = data["awardRequest"] == AwardRequest.Type.EXCELLENCE
+    if wants_award and not excellence_eligible(settings, data["waecStatus"], data["waecYear"], data["numAs"]):
         raise ServiceError(
             f"The Excellence Award needs WAEC/NECO from {settings.excellence_min_waec_year} or later "
             f"with at least {settings.excellence_min_as} A's.", "not_eligible", field="awardRequest",
         )
 
-    user = _resolve_applicant(data, request_user)
-
-    existing = (Application.objects.filter(user=user, programme=programme, cohort=cohort)
+    # A self-applicant applies as themselves; a parent enters each child's details.
+    email = data["email"] if user.role == User.Role.PARENT else user.email
+    first, last = data["firstName"].strip(), data["lastName"].strip()
+    existing = (Application.objects.filter(user=user, first_name__iexact=first, last_name__iexact=last, dob=data["dob"],
+                                           programme=programme, cohort=cohort)
                 .exclude(status=Application.Status.REJECTED).first())
     if existing:
         raise ServiceError(
-            f"You've already applied for {programme.name} ({existing.number}).", "duplicate_application",
-            extra={"applicationId": existing.number, "paymentStatus": existing.payment_status},
+            f"{first} {last} already has an application for {programme.name} ({existing.number}).",
+            "duplicate_application", extra={"applicationId": existing.number},
         )
 
-    q = quote(programme, cohort, settings)
+    q = programme_quote(Application(programme=programme, cohort=cohort), settings)
     app = Application.objects.create(
         number=f"TSCE/APP/{today().year}/{Sequence.next('app'):05d}",
         user=user,
-        first_name=data["firstName"].strip(), middle_name=data["middleName"].strip(), last_name=data["lastName"].strip(),
-        gender=data["gender"], dob=data["dob"], phone=data["phone"], email=data["email"],
+        first_name=first, middle_name=data["middleName"].strip(), last_name=last,
+        gender=data["gender"], dob=data["dob"], phone=data["phone"], email=email,
         address=data["address"].strip(), state=data["state"], lga=data["lga"].strip(),
         qualification=data["qualification"], institution=data["institution"].strip(), grad_year=data["gradYear"],
         waec_status=data["waecStatus"], waec_year=data["waecYear"], num_as=data["numAs"] or 0,
         waec_file=data.get("resultFile") or "",
         programme=programme, cohort=cohort, schedule=data["schedule"],
+        application_fee=settings.application_fee,
         fee=q.fee, discount_type=q.discount_type, discount_pct=q.discount_pct,
         discount_amount=q.discount_amount, amount_payable=q.amount_payable,
     )
-    ApplicationEvent.objects.create(application=app, text="Application submitted online", actor=user)
-
-    if award_type:
-        if award_type == AwardRequest.Type.EXCELLENCE:
-            evidence = f"WAEC {app.waec_year} — {app.num_as} A's (declared{', result uploaded' if app.waec_file else ''})"
-            requested = settings.excellence_pct
-        else:
-            evidence = "Intake exam / interview to be scheduled"
-            requested = settings.scholarship_max_pct
-        AwardRequest.objects.create(application=app, type=award_type, requested_pct=requested, evidence=evidence)
-        ApplicationEvent.objects.create(application=app, text=f"{AwardRequest.Type(award_type).label} review requested", actor=user)
+    _event(app, "Application submitted online", actor=user)
+    if wants_award:
+        AwardRequest.objects.create(
+            application=app, type=AwardRequest.Type.EXCELLENCE, requested_pct=settings.excellence_pct,
+            evidence=f"WAEC {app.waec_year} — {app.num_as} A's (declared{', result uploaded' if app.waec_file else ''})",
+        )
+        _event(app, "Excellence Award requested — result to be verified in person", actor=user)
 
     notify(user, "Application received",
-           f"Your application {app.number} for {programme.name} has been received. Complete your payment to secure your seat.",
-           Notification.Type.APPLICATION)
+           f"The application {app.number} for {app.full_name} ({programme.name}) has been received. "
+           f"Pay the {naira(app.application_fee)} application fee to complete it.",
+           Notification.Type.APPLICATION, link=MY_APPLICATIONS, email=True)
     if settings.staff_application_alerts:
         notify_staff("New application", f"{app.full_name} applied for {programme.name}.", Notification.Type.APPLICATION)
     return app
 
 
-def _naira(amount):
-    return f"\u20a6{amount:,}"
+def admit(app: Application, actor=None) -> Application:
+    """Admission approved: price the programme fee and invite payment."""
+    settings = SiteSettings.load()
+    q = programme_quote(app, settings)
+    app.discount_type, app.discount_pct = q.discount_type, q.discount_pct
+    app.discount_amount, app.amount_payable = q.discount_amount, q.amount_payable
+    app.status = Application.Status.ADMITTED
+    app.save()
+    _event(app, "Admission approved" + (" by the admissions office" if actor else " automatically"), ok=True, actor=actor)
+    notify(app.user, "Admission approved",
+           f"Congratulations! {app.full_name} has been admitted to {app.programme.name} ({app.cohort.name}). "
+           f"Pay the programme fee of {naira(app.amount_payable)} to secure {'the' if app.user.role == User.Role.PARENT else 'your'} seat.",
+           Notification.Type.APPLICATION, link=MY_APPLICATIONS, email=True)
+    return app
 
 
-def mark_paid(app: Application, payment) -> Application:
-    """
-    A verified successful payment for this application. Activates the student:
-    Student record (one per person) + Enrollment + student portal role.
-    Must be called inside the transaction that marked the payment SUCCESS.
-    """
-    from apps.academics.models import Enrollment, Student
-    from apps.comms.models import Notification
+def application_fee_paid(app: Application, payment) -> Application:
+    """Verified application-fee payment. Call inside the transaction that confirmed the payment."""
+    app = Application.objects.select_related("user", "programme", "cohort").get(pk=app.pk)
+    if app.application_fee_paid_at:
+        _flag_duplicate(app, payment, "application fee")
+        return app
+    app.application_fee_paid_at = payment.verified_at or timezone.now()
+    app.save(update_fields=["application_fee_paid_at", "updated_at"])
+    _event(app, f"Application fee of {naira(payment.amount)} paid ({payment.reference})", ok=True)
+
+    award = getattr(app, "award_request", None)
+    if award and award.status == AwardRequest.Status.PENDING:
+        app.status = Application.Status.AWAITING_VERIFICATION
+        app.save(update_fields=["status", "updated_at"])
+        notify(app.user, "Bring the WAEC/NECO result to TSCE",
+               f"The application fee for {app.full_name} is paid. To confirm the Excellence Award, please visit TSCE "
+               f"({SiteSettings.load().address}) with the original WAEC/NECO result. Admission is confirmed after "
+               "verification, and you can then pay the programme fee in the portal.",
+               Notification.Type.SCHOLARSHIP, link=MY_APPLICATIONS, email=True)
+        notify_staff("Excellence Award to verify", f"{app.full_name} ({app.number}) will bring a WAEC/NECO result for verification.",
+                     Notification.Type.SCHOLARSHIP)
+        return app
+    return admit(app)
+
+
+@transaction.atomic
+def review_award(app: Application, approve: bool, staff_user, note: str = "") -> Application:
+    """Staff decision after seeing the result in person. Either way the applicant is admitted."""
+    app = Application.objects.select_related("user", "programme", "cohort", "award_request").select_for_update().get(pk=app.pk)
+    award = getattr(app, "award_request", None)
+    if award is None or award.status != AwardRequest.Status.PENDING:
+        raise ServiceError("There is no pending award request on this application.", "no_pending_award")
+    if app.status != Application.Status.AWAITING_VERIFICATION:
+        raise ServiceError("The application fee must be paid before the award can be reviewed.", "fee_unpaid")
+
+    settings = SiteSettings.load()
+    award.status = AwardRequest.Status.APPROVED if approve else AwardRequest.Status.REJECTED
+    award.awarded_pct = settings.excellence_pct if approve else None
+    award.reviewed_by, award.reviewed_at, award.note = staff_user, timezone.now(), note[:300]
+    award.save()
+    _event(app, f"Excellence Award {'approved' if approve else 'not approved'} after result verification"
+                + (f" — {note}" if note else ""), ok=approve, actor=staff_user)
+    notify(app.user, "Excellence Award " + ("approved" if approve else "decision"),
+           f"The Excellence Award for {app.full_name} was "
+           + (f"approved: {settings.excellence_pct}% off the programme fee." if approve
+              else "not approved, so the normal programme fee applies.")
+           + (f" Note from admissions: {note}" if note else ""),
+           Notification.Type.SCHOLARSHIP, link=MY_APPLICATIONS)
+    return admit(app, actor=staff_user)
+
+
+def sync_programme_quote(app: Application, settings: SiteSettings) -> Application:
+    """Re-price at checkout: the early bird depends on the PAYMENT date; an approved award never changes."""
+    q = programme_quote(app, settings)
+    if q.amount_payable != app.amount_payable or q.discount_type != app.discount_type:
+        old = app.amount_payable
+        app.discount_type, app.discount_pct = q.discount_type, q.discount_pct
+        app.discount_amount, app.amount_payable = q.discount_amount, q.amount_payable
+        app.save(update_fields=["discount_type", "discount_pct", "discount_amount", "amount_payable", "updated_at"])
+        _event(app, f"Programme fee re-priced at payment: {naira(old)} → {naira(app.amount_payable)}")
+    return app
+
+
+def _find_or_create_student(app: Application):
+    from apps.academics.models import Student
+
+    account = app.user
+    if account.role == User.Role.PARENT:
+        student = Student.objects.filter(guardian=account, first_name__iexact=app.first_name,
+                                         last_name__iexact=app.last_name, dob=app.dob).first()
+        owner = {"guardian": account}
+    else:
+        student = Student.objects.filter(user=account).first()
+        owner = {"user": account}
+    if student:
+        return student
+    return Student.objects.create(
+        **owner, student_no=f"TSCE/{today().year}/{Sequence.next('student'):05d}",
+        first_name=app.first_name, middle_name=app.middle_name, last_name=app.last_name, gender=app.gender,
+        dob=app.dob, phone=app.phone, email=app.email, address=app.address, state=app.state, lga=app.lga,
+        qualification=app.qualification, institution=app.institution,
+    )
+
+
+def programme_fee_paid(app: Application, payment) -> Application:
+    """Verified programme-fee payment → enrolled. Call inside the transaction that confirmed the payment."""
+    from apps.academics.models import Enrollment
 
     app = Application.objects.select_related("user", "programme", "cohort").get(pk=app.pk)
-    settings = SiteSettings.load()
-
     if app.payment_status == Application.PaymentStatus.PAID:
-        # Two checkouts both completed (e.g. two tabs). Keep the money on record and flag it.
-        ApplicationEvent.objects.create(application=app, text=f"Duplicate payment {payment.reference} ({_naira(payment.amount)}) received — refund required")
-        notify_staff("Duplicate payment — refund needed",
-                     f"{app.full_name} paid twice for {app.number}. Refund {payment.reference} ({_naira(payment.amount)}).",
-                     Notification.Type.PAYMENT)
+        _flag_duplicate(app, payment, "programme fee")
         return app
 
-    user = app.user
-    student = Student.objects.filter(user=user).first()
-    if student is None:
-        student = Student.objects.create(
-            user=user, student_no=f"TSCE/{today().year}/{Sequence.next('student'):05d}",
-            first_name=app.first_name, middle_name=app.middle_name, last_name=app.last_name, gender=app.gender,
-            dob=app.dob, phone=app.phone, address=app.address, state=app.state, lga=app.lga,
-            qualification=app.qualification, institution=app.institution,
-        )
-    if user.role == User.Role.APPLICANT:
-        user.role = User.Role.STUDENT
-        user.save(update_fields=["role"])
+    student = _find_or_create_student(app)
+    if app.user.role == User.Role.APPLICANT:
+        app.user.role = User.Role.STUDENT
+        app.user.save(update_fields=["role"])
 
-    events = [ApplicationEvent(application=app, ok=True,
-                               text=f"Payment of {_naira(payment.amount)} confirmed via Zainpay ({payment.reference})")]
-    enrolled_now = app.status == Application.Status.ACCEPTED
-    if enrolled_now:
-        app.status = Application.Status.ENROLLED
-        events.append(ApplicationEvent(application=app, ok=True, text=f"Enrolled as {student.student_no}"))
-
+    app.status = Application.Status.ENROLLED
     app.payment_status = Application.PaymentStatus.PAID
-    app.paid_at = payment.verified_at
+    app.paid_at = payment.verified_at or timezone.now()
     app.save(update_fields=["status", "payment_status", "paid_at", "updated_at"])
-
     Enrollment.objects.create(
         student=student, application=app, programme=app.programme, cohort=app.cohort, schedule=app.schedule,
         start_date=app.cohort.start_date, end_date=app.programme.end_date_from(app.cohort.start_date),
-        status=Enrollment.Status.ACTIVE if enrolled_now else Enrollment.Status.ADMISSION_PENDING,
-        amount_paid=payment.amount,
+        status=Enrollment.Status.ACTIVE, amount_paid=payment.amount,
     )
-    events.append(ApplicationEvent(application=app, ok=True, text=f"Student portal account activated ({student.student_no})"))
-    ApplicationEvent.objects.bulk_create(events)
+    _event(app, f"Programme fee of {naira(payment.amount)} paid ({payment.reference})", ok=True)
+    _event(app, f"Enrolled as {student.student_no}", ok=True)
 
-    notify(user, "Payment successful", f"Your payment of {_naira(payment.amount)} was successful. Ref: {payment.reference}",
-           Notification.Type.PAYMENT)
-    notify(user, "Welcome to TSCE",
-           f"Your student number is {student.student_no}. Classes for the {app.cohort.name} begin on "
-           f"{app.cohort.start_date.day} {app.cohort.start_date:%B %Y}.", Notification.Type.ANNOUNCEMENT)
-    if settings.staff_payment_alerts:
-        notify_staff("Payment received", f"{app.full_name} paid {_naira(payment.amount)} for {app.programme.name}.",
+    start = app.cohort.start_date
+    notify(app.user, "Enrolment confirmed",
+           f"{app.full_name} is enrolled in {app.programme.name}. Student number: {student.student_no}. "
+           f"Classes for the {app.cohort.name} begin on {start.day} {start:%B %Y}. Receipt: {payment.reference}.",
+           Notification.Type.PAYMENT, link=MY_APPLICATIONS, email=True)
+    if SiteSettings.load().staff_payment_alerts:
+        notify_staff("Programme fee received", f"{app.full_name} paid {naira(payment.amount)} for {app.programme.name}.",
                      Notification.Type.PAYMENT)
     return app
 
 
-def mark_payment_failed(app: Application, payment) -> None:
-    if app.payment_status in (Application.PaymentStatus.PAID, Application.PaymentStatus.REFUNDED):
-        return
-    Application.objects.filter(pk=app.pk).update(payment_status=Application.PaymentStatus.FAILED)
-    ApplicationEvent.objects.create(application=app, text=f"Payment attempt failed ({payment.reference})")
+def payment_failed(app: Application, payment) -> None:
+    from apps.payments.models import Payment
+
+    if payment.purpose == Payment.Purpose.PROGRAMME_FEE and app.payment_status == Application.PaymentStatus.UNPAID:
+        Application.objects.filter(pk=app.pk).update(payment_status=Application.PaymentStatus.FAILED)
+    _event(app, f"{payment.get_purpose_display()} payment attempt failed ({payment.reference})")
 
 
-def requote_for_payment(app: Application, settings: SiteSettings) -> Application:
-    """
-    The early-bird discount depends on the PAYMENT date: an application made
-    before the deadline but paid after it pays the full fee. Approved awards
-    (excellence/scholarship) are not affected.
-    """
-    from .models import DiscountType
+def _flag_duplicate(app, payment, what):
+    """Two checkouts both completed (e.g. two tabs). Keep the money on record and flag it for refund."""
+    _event(app, f"Duplicate {what} payment {payment.reference} ({naira(payment.amount)}) received — refund required")
+    notify_staff("Duplicate payment — refund needed",
+                 f"{app.full_name} paid the {what} twice for {app.number}. Refund {payment.reference} ({naira(payment.amount)}).",
+                 Notification.Type.PAYMENT)
 
-    if app.discount_type == DiscountType.EARLY_BIRD:
-        q = quote(app.programme, app.cohort, settings)
-        if q.discount_type != DiscountType.EARLY_BIRD:
-            app.discount_type, app.discount_pct = q.discount_type, q.discount_pct
-            app.discount_amount, app.amount_payable = q.discount_amount, q.amount_payable
-            app.save(update_fields=["discount_type", "discount_pct", "discount_amount", "amount_payable", "updated_at"])
-            ApplicationEvent.objects.create(
-                application=app, text=f"Early-bird period ended before payment — amount payable is now {_naira(app.amount_payable)}")
+
+@transaction.atomic
+def reject_application(app: Application, staff_user, note: str) -> Application:
+    """Staff decision. Enrolled students are withdrawn through the student record, not here."""
+    app = Application.objects.select_related("user", "programme").get(pk=app.pk)
+    if app.status in (Application.Status.ENROLLED, Application.Status.REJECTED):
+        raise ServiceError(f"An application that is {app.status.lower()} can't be rejected.", "invalid_state")
+    app.status = Application.Status.REJECTED
+    app.save(update_fields=["status", "updated_at"])
+    award = getattr(app, "award_request", None)
+    if award and award.status == AwardRequest.Status.PENDING:
+        award.status, award.reviewed_by, award.reviewed_at = AwardRequest.Status.REJECTED, staff_user, timezone.now()
+        award.note = "Application not successful"
+        award.save()
+    _event(app, "Application not successful" + (f" — {note}" if note else ""), actor=staff_user)
+    notify(app.user, "Application update",
+           f"We're sorry — the application {app.number} for {app.full_name} ({app.programme.name}) was not successful."
+           + (f" Reason: {note}" if note else "") + " The application fee is non-refundable.",
+           Notification.Type.APPLICATION, link=MY_APPLICATIONS, email=True)
     return app
+
+
+def send_reminder(app: Application, staff_user) -> str:
+    """Nudge the account holder about the next payment due. Returns what was reminded."""
+    charge = dj_settings.ZAINPAY["PAYER_CHARGE"]
+    if app.status == Application.Status.PENDING:
+        what, amount = "application fee", app.application_fee
+    elif app.status == Application.Status.ADMITTED:
+        what, amount = "programme fee", app.amount_payable
+    else:
+        raise ServiceError("There is no payment due on this application.", "nothing_due")
+    notify(app.user, f"Reminder: {what} due",
+           f"The {what} of {naira(amount + charge)} for {app.full_name} ({app.programme.name}) is still due. "
+           "Pay it from My applications" + (" to secure the seat — places are limited." if what == "programme fee" else "."),
+           Notification.Type.PAYMENT, link=MY_APPLICATIONS, email=True)
+    _event(app, f"Payment reminder sent ({what})", actor=staff_user)
+    return what

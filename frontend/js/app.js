@@ -203,6 +203,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         Dashboard.mount(portal, page, session);
         if (session.mustChangePassword) Auth.forcePasswordChange();
         const view = UI.$("#view");
+        if (Dashboard.isSoon(portal, page)) {
+            view.innerHTML = UI.empty({ icon: "fa-person-digging", title: "Coming soon", text: "This section is being connected to the live system. Its old demo data has been switched off so nobody works on fake records.", action: `<a class="btn btn-primary" href="dashboard.html">Back to dashboard</a>` });
+            return;
+        }
         const run = Pages[page];
         if (run) UI.safe(() => run(view, ctx), page);
         if (location.hash) setTimeout(() => UI.$(location.hash)?.scrollIntoView({ behavior: "smooth" }), 300);

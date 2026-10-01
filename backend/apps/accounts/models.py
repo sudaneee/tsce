@@ -29,6 +29,7 @@ class UserManager(BaseUserManager):
 
     def create_superuser(self, email, password=None, **extra):
         extra.setdefault("role", User.Role.ADMIN)
+        extra.setdefault("email_verified_at", timezone.now())
         extra["is_staff"] = True
         extra["is_superuser"] = True
         return self._create_user(email, password, **extra)
@@ -36,17 +37,21 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser, PermissionsMixin):
     class Role(models.TextChoices):
-        APPLICANT = "applicant", "Applicant"
-        STUDENT = "student", "Student"
+        APPLICANT = "applicant", "Applicant"     # applying for themselves, not enrolled yet
+        PARENT = "parent", "Parent / Guardian"   # applies for and manages their children
+        STUDENT = "student", "Student"           # enrolled self-applicant
         STAFF = "staff", "Staff"
         ADMIN = "admin", "Admin"
 
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=150)
+    phone = models.CharField(max_length=30, blank=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.APPLICANT, db_index=True)
     is_active = models.BooleanField(default=True)
     # Access to the Django admin back office (not the same as the staff portal).
     is_staff = models.BooleanField(default=False)
+    # Applicants and parents must verify their email before applying or signing in.
+    email_verified_at = models.DateTimeField(null=True, blank=True)
     # Set when an admin resets the password; the portal then forces a change.
     must_change_password = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
@@ -66,6 +71,19 @@ class User(AbstractBaseUser, PermissionsMixin):
     def save(self, *args, **kwargs):
         self.email = self.email.strip().lower()
         super().save(*args, **kwargs)
+
+    @property
+    def email_verified(self):
+        return self.email_verified_at is not None
+
+    @property
+    def needs_email_verification(self):
+        """Only self-registered accounts verify by email; admins create staff accounts."""
+        return self.role in (self.Role.APPLICANT, self.Role.PARENT, self.Role.STUDENT) and not self.email_verified
+
+    @property
+    def can_apply(self):
+        return self.role in (self.Role.APPLICANT, self.Role.PARENT, self.Role.STUDENT)
 
     @property
     def is_portal_staff(self):

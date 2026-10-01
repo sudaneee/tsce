@@ -1,12 +1,15 @@
 """
-Admissions calendar and fee rules (from the TSCE flyer):
+Admissions calendar and fee rules.
 
-  • Early Bird 15%  — payment before the cohort's early-bird deadline (automatic)
-  • Excellence 50%  — WAEC from 2020 to date with 5 A's or more (staff verifies)
-  • Scholarship ≤40% — intake exam / interview performance (staff assigns)
+Two payments: the APPLICATION FEE (flat, SiteSettings.application_fee) and the
+PROGRAMME FEE. Discounts apply to the programme fee only:
 
-Discounts do NOT stack: the single highest approved discount applies.
-All percentages and thresholds come from SiteSettings, so staff can change them.
+  • Early Bird 15%  — programme fee paid before the cohort's early-bird deadline (automatic)
+  • Excellence 50%  — WAEC/NECO from 2020 to date with 5 A's or more, verified in person by staff
+
+Discounts do NOT stack: the single highest applies. (The flyer's Performance
+Scholarship was discontinued on 1 Oct 2026.) Percentages and thresholds come
+from SiteSettings, so staff can change them.
 """
 from dataclasses import dataclass
 from datetime import date
@@ -68,17 +71,31 @@ class Quote:
     amount_payable: int
 
 
-def quote(programme, cohort, settings: SiteSettings, on: date | None = None) -> Quote:
-    """Amount payable now. Only the automatic (early-bird) discount applies at checkout."""
-    pct = settings.early_bird_pct if early_bird_open(cohort, on) else 0
+def quote(programme, cohort, settings: SiteSettings, on: date | None = None, award_pct: int = 0) -> Quote:
+    """
+    Programme fee payable if paid on `on` (default today): the higher of an
+    approved Excellence Award (award_pct) and the early bird, never both.
+    """
+    eb_pct = settings.early_bird_pct if early_bird_open(cohort, on) else 0
+    if award_pct and award_pct >= eb_pct:
+        kind, pct = DiscountType.EXCELLENCE, award_pct
+    elif eb_pct:
+        kind, pct = DiscountType.EARLY_BIRD, eb_pct
+    else:
+        kind, pct = "", 0
     discount = round(programme.fee * pct / 100)
-    return Quote(
-        fee=programme.fee,
-        discount_type=DiscountType.EARLY_BIRD if pct else "",
-        discount_pct=pct,
-        discount_amount=discount,
-        amount_payable=programme.fee - discount,
-    )
+    return Quote(fee=programme.fee, discount_type=kind, discount_pct=pct, discount_amount=discount,
+                 amount_payable=programme.fee - discount)
+
+
+def programme_quote(app, settings: SiteSettings, on: date | None = None) -> Quote:
+    """The programme fee for an application, counting its award if approved."""
+    from .models import AwardRequest
+
+    award = getattr(app, "award_request", None)
+    approved = award is not None and award.status == AwardRequest.Status.APPROVED
+    award_pct = (award.awarded_pct or 0) if approved else 0
+    return quote(app.programme, app.cohort, settings, on, award_pct=award_pct)
 
 
 def seats_taken(cohort) -> dict[int, int]:

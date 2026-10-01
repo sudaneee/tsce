@@ -10,9 +10,14 @@ from .grading import grade_for
 
 
 class Student(TimeStampedModel):
-    """A person admitted to TSCE. Created when an application's payment is confirmed."""
+    """
+    A person enrolled at TSCE, created when their programme fee is paid.
+    Self-applicants sign in as themselves (user). A parent's child has no login
+    of their own (user is empty) and is managed through the guardian's account.
+    """
 
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="student")
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="student")
+    guardian = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="children")
     student_no = models.CharField("student number", max_length=30, unique=True)  # TSCE/2026/00001
     first_name = models.CharField(max_length=60)
     middle_name = models.CharField(max_length=60, blank=True)
@@ -20,6 +25,7 @@ class Student(TimeStampedModel):
     gender = models.CharField(max_length=10)
     dob = models.DateField("date of birth", null=True, blank=True)
     phone = models.CharField(max_length=30)
+    email = models.EmailField(blank=True)
     address = models.CharField(max_length=300, blank=True)
     state = models.CharField(max_length=40, blank=True)
     lga = models.CharField("LGA", max_length=80, blank=True)
@@ -39,15 +45,15 @@ class Student(TimeStampedModel):
         return " ".join(p for p in (self.first_name, self.middle_name, self.last_name) if p)
 
     @property
-    def email(self):
-        return self.user.email
+    def account(self):
+        """The login that manages this student: their own, or their parent's."""
+        return self.user or self.guardian
 
 
 class Enrollment(TimeStampedModel):
     """A student's place on one programme in one cohort."""
 
     class Status(models.TextChoices):
-        ADMISSION_PENDING = "Admission Pending"   # paid, awaiting staff acceptance
         ACTIVE = "Active"
         COMPLETED = "Completed"
         SUSPENDED = "Suspended"
@@ -60,7 +66,7 @@ class Enrollment(TimeStampedModel):
     schedule = models.CharField(max_length=80)
     start_date = models.DateField()
     end_date = models.DateField()
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ADMISSION_PENDING, db_index=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE, db_index=True)
     # Overall completion, set by staff. Per-module progress is derived from it.
     progress = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(100)])
     amount_paid = models.PositiveIntegerField(default=0)

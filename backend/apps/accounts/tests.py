@@ -1,5 +1,6 @@
 from django.core.cache import cache
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from .models import StaffProfile, User
@@ -21,6 +22,7 @@ class AuthTestCase(TestCase):
         return self.client.post("/api/auth/login", {"email": email, "password": password, **extra}, format="json", **self.csrf())
 
     def make(self, email, role, **extra):
+        extra.setdefault("email_verified_at", timezone.now())
         return User.objects.create_user(email, PW, full_name=email.split("@")[0].title(), role=role, **extra)
 
 
@@ -135,3 +137,72 @@ class AdminResetPasswordTests(AuthTestCase):
         self.assertEqual(self.reset(other).status_code, 403)
         User.objects.filter(pk=self.admin.pk).update(is_superuser=True)
         self.assertEqual(self.reset(other).status_code, 200)
+
+
+@override_settings(CACHES=LOCMEM, EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class RegistrationTests(AuthTestCase):
+    def register(self, **over):
+        data = {"accountType": "parent", "fullName": "Hajiya Rabi Musa", "email": "Rabi.Musa@example.com",
+                "phone": "0803 123 4567", "password": PW, **over}
+        with self.captureOnCommitCallbacks(execute=True):  # the email is sent after commit
+            return self.client.post("/api/auth/register", data, format="json", **self.csrf())
+
+    def link_token(self):
+        from django.core import mail
+        body = mail.outbox[-1].body
+        return body.split("verify-email.html?token=")[1].split()[0]
+
+    def test_register_sends_verification_and_blocks_login_until_verified(self):
+        from django.core import mail
+        res = self.register()
+        self.assertEqual(res.status_code, 201)
+        user = User.objects.get()
+        self.assertEqual((user.email, user.role, user.phone, user.email_verified), ("rabi.musa@example.com", "parent", "0803 123 4567", False))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("verify-email.html?token=", mail.outbox[0].body)
+
+        res = self.login("rabi.musa@example.com")
+        self.assertEqual((res.status_code, res.json()["code"]), (400, "email_unverified"))
+        self.assertEqual(len(mail.outbox), 2)  # a fresh link on each blocked login
+
+        res = self.client.post("/api/auth/verify-email", {"token": self.link_token()}, format="json", **self.csrf())
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["user"]["role"], "parent")
+        self.assertTrue(self.client.get("/api/auth/me").json()["user"]["emailVerified"])  # signed in
+
+    def test_old_link_does_not_sign_in_again(self):
+        self.register(accountType="student")
+        token = self.link_token()
+        self.client.post("/api/auth/verify-email", {"token": token}, format="json", **self.csrf())
+        self.client.post("/api/auth/logout", **self.csrf())
+        res = self.client.post("/api/auth/verify-email", {"token": token}, format="json", **self.csrf())
+        self.assertEqual(res.json(), {"user": None, "alreadyVerified": True})
+        self.assertIsNone(self.client.get("/api/auth/me").json()["user"])
+        self.assertEqual(User.objects.get().role, "applicant")
+
+    def test_bad_or_tampered_token(self):
+        res = self.client.post("/api/auth/verify-email", {"token": "nonsense"}, format="json", **self.csrf())
+        self.assertEqual(res.json()["code"], "invalid_token")
+
+    def test_existing_email_gets_same_answer_and_no_new_account(self):
+        from django.core import mail
+        self.make("taken@example.com", User.Role.APPLICANT, email_verified_at=timezone.now())
+        res = self.register(email="taken@example.com")
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(User.objects.count(), 1)
+        self.assertIn("already exists", mail.outbox[-1].body)
+
+    def test_validation(self):
+        res = self.register(phone="123", password="password", accountType="teacher", email="nope")
+        self.assertEqual(set(res.json()["fields"]), {"phone", "accountType", "email"})
+        res = self.register(password="password")
+        self.assertEqual(list(res.json()["fields"]), ["password"])
+
+    def test_resend_is_silent_about_unknown_emails(self):
+        from django.core import mail
+        self.register()
+        mail.outbox.clear()
+        for email in ("rabi.musa@example.com", "nobody@example.com"):
+            res = self.client.post("/api/auth/resend-verification", {"email": email}, format="json", **self.csrf())
+            self.assertEqual(res.json(), {"ok": True})
+        self.assertEqual(len(mail.outbox), 1)

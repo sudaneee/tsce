@@ -6,7 +6,7 @@ from html import escape
 from urllib.parse import urlencode
 
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404
@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from apps.accounts.permissions import IsPortalStaff
 from apps.admissions.models import Application
 from apps.core.exceptions import ServiceError
 
@@ -47,16 +48,17 @@ class PaymentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Payment
-        fields = ["ref", "kind", "applicationId", "programmeId", "studentId", "name", "email", "description", "amount",
+        fields = ["ref", "kind", "purpose", "applicationId", "programmeId", "studentId", "name", "email", "description", "amount",
                   "fee", "discount", "status", "channel", "gateway", "failureReason", "createdAt", "verifiedAt", "refundedAt"]
 
     def get_studentId(self, obj):
-        student = getattr(obj.user, "student", None) if obj.user_id else None
-        return student.student_no if student else None
+        # The enrolled person (a parent's child has no user of their own).
+        enrollment = getattr(obj.application, "enrollment", None) if obj.application_id else None
+        return enrollment.student.student_no if enrollment else None
 
 
 def _visible_payments(user):
-    qs = Payment.objects.select_related("application__programme", "user__student")
+    qs = Payment.objects.select_related("application__programme", "application__enrollment__student")
     if user.is_portal_staff:
         return qs
     return qs.filter(Q(user=user) | Q(application__user=user))
@@ -67,7 +69,7 @@ def callback_url(request):
 
 
 class InitializePaymentView(APIView):
-    """POST {applicationId} → {ref, checkoutUrl, amount}. The browser then goes to checkoutUrl."""
+    """POST {applicationId, purpose: application_fee|programme_fee} → {ref, checkoutUrl, amount}."""
 
     permission_classes = [IsAuthenticated]
     throttle_classes = [ScopedRateThrottle]
@@ -78,9 +80,11 @@ class InitializePaymentView(APIView):
         app = Application.objects.filter(number=number, user=request.user).first()
         if app is None:
             raise Http404
-        payment = services.start_checkout(app, callback_url(request))
+        purpose = str(request.data.get("purpose") or Payment.Purpose.APPLICATION_FEE)
+        payment = services.start_checkout(app, purpose, callback_url(request))
         request.session[SESSION_REF] = payment.reference
-        return Response({"ref": payment.reference, "checkoutUrl": payment.checkout_url, "amount": payment.amount})
+        return Response({"ref": payment.reference, "purpose": payment.purpose, "checkoutUrl": payment.checkout_url,
+                         "amount": payment.amount})
 
 
 class PaymentDetailView(APIView):
@@ -239,3 +243,66 @@ def simulator_checkout(request, ref):
         payment.gateway_payload = {**payment.gateway_payload, "simulator": sim}
         payment.save(update_fields=["gateway_payload", "updated_at"])
     return HttpResponseRedirect((sim.get("callback") or "/api/payments/zainpay/callback") + "?" + urlencode({"txnRef": ref}))
+
+
+# ---------------------------------------------------------------------------
+# Staff: transactions list and duplicate refunds
+# ---------------------------------------------------------------------------
+class StaffPaymentRowSerializer(PaymentSerializer):
+    isDuplicate = serializers.SerializerMethodField()
+    refundOf = serializers.CharField(source="parent.reference", default=None)
+
+    class Meta(PaymentSerializer.Meta):
+        fields = PaymentSerializer.Meta.fields + ["isDuplicate", "refundOf"]
+
+    def get_isDuplicate(self, obj):
+        return (obj.kind == Payment.Kind.CHARGE and obj.status == Payment.Status.SUCCESS and obj.application_id is not None
+                and obj.pk not in self.context["counted"])
+
+
+class StaffPaymentsView(APIView):
+    """GET ?status=&purpose=&kind=&q= → {results, summary}."""
+
+    permission_classes = [IsPortalStaff]
+
+    def get(self, request):
+        p = request.query_params
+        qs = Payment.objects.select_related("application__programme", "application__enrollment__student", "parent")
+        for key, field in (("status", "status"), ("purpose", "purpose"), ("kind", "kind")):
+            if p.get(key):
+                qs = qs.filter(**{field: p[key]})
+        if p.get("q"):
+            q = p["q"].strip()
+            qs = qs.filter(Q(reference__icontains=q) | Q(name__icontains=q) | Q(email__icontains=q)
+                           | Q(application__number__icontains=q))
+        counted = services.counted_charge_ids()
+        rows = StaffPaymentRowSerializer(qs.order_by("-created_at")[:2000], many=True, context={"counted": counted}).data
+        charges = Payment.objects.filter(kind=Payment.Kind.CHARGE)
+        total = lambda **f: charges.filter(**f).aggregate(t=Sum("amount"))["t"] or 0  # noqa: E731
+        return Response({"results": rows, "summary": {
+            "collected": total(status=Payment.Status.SUCCESS) + total(status=Payment.Status.REFUNDED),
+            "applicationFees": total(status__in=[Payment.Status.SUCCESS, Payment.Status.REFUNDED], purpose=Payment.Purpose.APPLICATION_FEE),
+            "programmeFees": total(status__in=[Payment.Status.SUCCESS, Payment.Status.REFUNDED], purpose=Payment.Purpose.PROGRAMME_FEE),
+            "refunded": Payment.objects.filter(kind=Payment.Kind.REFUND).aggregate(t=Sum("amount"))["t"] or 0,
+            "pending": charges.filter(status=Payment.Status.PENDING).count(),
+            "failed": charges.filter(status=Payment.Status.FAILED).count(),
+            "duplicates": sum(1 for r in rows if r["isDuplicate"]),
+        }})
+
+
+class RefundSerializer(serializers.Serializer):
+    transferRef = serializers.CharField(max_length=100)
+    note = serializers.CharField(max_length=300, required=False, allow_blank=True, default="")
+
+
+class StaffRefundView(APIView):
+    """Record a refund already sent by bank transfer (duplicate payments only)."""
+
+    permission_classes = [IsPortalStaff]
+
+    def post(self, request, ref):
+        payment = get_object_or_404(Payment, reference=ref, kind=Payment.Kind.CHARGE)
+        data = RefundSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        refund = services.refund_duplicate(payment, request.user, data.validated_data["transferRef"], data.validated_data["note"])
+        return Response(PaymentSerializer(refund).data, status=201)

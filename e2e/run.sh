@@ -15,6 +15,8 @@ export E2E_BASE="http://localhost:$PORT" PYTHONIOENCODING=utf-8
 export SQLITE_PATH="$WORK/db.sqlite3" CACHE_DIR="$WORK/cache" PRIVATE_MEDIA_ROOT="$WORK/private"
 # Browser tests always use the built-in simulator, never a real gateway.
 export PAYMENT_GATEWAY=simulator
+# Emails go to the server console (and so to server.log), where tests can read them.
+export EMAIL_HOST_USER= E2E_SERVER_LOG="$WORK/server.log"
 
 PY="$REPO/backend/.venv/Scripts/python"; [ -x "$PY" ] || PY="$REPO/backend/.venv/bin/python"
 TPY="$REPO/.e2e/venv/Scripts/python";   [ -x "$TPY" ] || TPY="$REPO/.e2e/venv/bin/python"
@@ -42,7 +44,7 @@ run_suite() {
     "$TPY" "${E2E_SCRIPT:-$REPO/e2e/test_$name.py}"
 }
 
-suites=("$@"); [ ${#suites[@]} -eq 0 ] && suites=(auth public payments)
+suites=("$@"); [ ${#suites[@]} -eq 0 ] && suites=(auth public payments journey staff)
 failed=0
 for s in "${suites[@]}"; do run_suite "$s" || failed=1; done
 exit $failed

@@ -2,7 +2,10 @@
 API field names are camelCase to match the existing frontend objects.
 """
 from django.contrib.auth import password_validation
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+
+from apps.core.validators import normalize_ng_phone
 
 from .models import User
 
@@ -16,13 +19,40 @@ def session_payload(user: User) -> dict:
         "id": user.pk,
         "email": user.email,
         "name": user.full_name,
+        "phone": user.phone,
         "role": user.role,
+        "emailVerified": user.email_verified,
         "isAdmin": user.role == User.Role.ADMIN,
         "studentId": student.student_no if student else None,
         "staffId": staff.staff_no if staff else None,
         "applicationId": latest_app.number if latest_app else None,
         "mustChangePassword": user.must_change_password,
     }
+
+
+class RegisterSerializer(serializers.Serializer):
+    accountType = serializers.ChoiceField(["student", "parent"])
+    fullName = serializers.CharField(max_length=150)
+    email = serializers.EmailField(max_length=254)
+    phone = serializers.CharField(max_length=30)
+    password = serializers.CharField(trim_whitespace=False, max_length=128)
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+    def validate_phone(self, value):
+        try:
+            return normalize_ng_phone(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages))
+
+    def validate(self, attrs):
+        probe = User(email=attrs["email"], full_name=attrs["fullName"])
+        try:
+            password_validation.validate_password(attrs["password"], probe)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"password": list(exc.messages)})
+        return attrs
 
 
 class LoginSerializer(serializers.Serializer):

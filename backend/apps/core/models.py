@@ -53,9 +53,9 @@ class SiteSettings(models.Model):
         "programmes.Cohort", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
     accepting_applications = models.BooleanField(default=True)
+    application_fee = models.PositiveIntegerField(default=5000, help_text="Naira, non-refundable, per application")
     early_bird_pct = models.PositiveSmallIntegerField(default=15)
     excellence_pct = models.PositiveSmallIntegerField(default=50)
-    scholarship_max_pct = models.PositiveSmallIntegerField(default=40)
     excellence_min_waec_year = models.PositiveSmallIntegerField(default=2020)
     excellence_min_as = models.PositiveSmallIntegerField(default=5)
 

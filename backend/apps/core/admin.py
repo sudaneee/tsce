@@ -8,10 +8,8 @@ class SiteSettingsAdmin(admin.ModelAdmin):
     fieldsets = [
         ("Institution", {"fields": ["institution_name", "short_name", "address", "city", "phones", "email", "website"]}),
         ("Certificates", {"fields": ["director_name", "director_title"]}),
-        ("Admissions", {"fields": ["current_cohort", "accepting_applications"]}),
-        ("Discounts (%)", {"fields": [
-            "early_bird_pct", "excellence_pct", "scholarship_max_pct", "excellence_min_waec_year", "excellence_min_as",
-        ]}),
+        ("Admissions", {"fields": ["current_cohort", "accepting_applications", "application_fee"]}),
+        ("Discounts (%)", {"fields": ["early_bird_pct", "excellence_pct", "excellence_min_waec_year", "excellence_min_as"]}),
         ("Payments", {"fields": ["payment_ref_prefix", "allow_card", "allow_transfer"]}),
         ("Notifications", {"fields": ["email_notifications", "staff_payment_alerts", "staff_application_alerts"]}),
     ]

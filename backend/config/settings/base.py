@@ -123,7 +123,7 @@ REST_FRAMEWORK = {
     ],
     "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
     "DATETIME_FORMAT": "iso-8601",
-    "DEFAULT_THROTTLE_RATES": {"login": "10/min", "apply": "30/hour", "public_form": "20/hour", "verify": "60/min", "payment": "30/min"},
+    "DEFAULT_THROTTLE_RATES": {"login": "10/min", "register": "10/hour", "verify_email": "20/hour", "apply": "30/hour", "public_form": "20/hour", "verify": "60/min", "payment": "30/min"},
     # Number of reverse proxies in front of Django (nginx = 1 in production), so
     # throttling uses the client's real IP from X-Forwarded-For.
     "NUM_PROXIES": env.int("NUM_PROXIES", default=0),
@@ -138,9 +138,24 @@ CACHES = {
     }
 }
 
-# --- Email (SMTP configured in Phase 10 once TSCE provides a mailbox) ---
-EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="TSCE <no-reply@tsce.edu.ng>")
+# --- Email: Gmail SMTP with an app password (same setup as the Glittering project) ---
+# With no EMAIL_HOST_USER, emails are printed to the console instead (development).
+EMAIL_HOST = env("EMAIL_HOST", default="smtp.gmail.com")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_TIMEOUT = 20
+EMAIL_BACKEND = env(
+    "EMAIL_BACKEND",
+    default="django.core.mail.backends.smtp.EmailBackend" if EMAIL_HOST_USER else "django.core.mail.backends.console.EmailBackend",
+)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default=f"TSCE <{EMAIL_HOST_USER}>" if EMAIL_HOST_USER else "TSCE <no-reply@tsce.edu.ng>")
+
+# Public address of the site, used to build links in emails (verification, payments).
+SITE_URL = env("SITE_URL", default="http://localhost:8000")
+# Email-verification links stay valid this long.
+EMAIL_VERIFICATION_MAX_AGE = 60 * 60 * 48
 
 # --- Payments ---
 # "simulator" for local development/demos, "zainpay" for sandbox/live.

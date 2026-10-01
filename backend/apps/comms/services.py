@@ -1,13 +1,24 @@
-"""In-app notifications. Email delivery is added in Phase 10, once TSCE has a mailbox."""
+"""In-app notifications, optionally emailed too (see notify(email=True))."""
 from apps.accounts.models import User
 
 from .models import Notification
 
 
-def notify(user, title, body, type=Notification.Type.ANNOUNCEMENT, link=""):
+def notify(user, title, body, type=Notification.Type.ANNOUNCEMENT, link="", email=False):
+    """In-app notification; with email=True it is also emailed (if email notifications are on)."""
     if user is None:
         return None
-    return Notification.objects.create(recipient=user, title=title, body=body, type=type, link=link)
+    note = Notification.objects.create(recipient=user, title=title, body=body, type=type, link=link)
+    if email:
+        from apps.core.emails import send_email, site_link
+        from apps.core.models import SiteSettings
+
+        if SiteSettings.load().email_notifications:
+            text = f"Dear {user.full_name},\n\n{body}"
+            if link:
+                text += f"\n\n{site_link(link)}"
+            send_email(f"TSCE: {title}", text, user.email)
+    return note
 
 
 def notify_staff(title, body, type=Notification.Type.ANNOUNCEMENT, link=""):

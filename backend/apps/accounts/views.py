@@ -14,9 +14,10 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from . import services
 from .models import User
 from .permissions import IsAdmin
-from .serializers import ChangePasswordSerializer, LoginSerializer, session_payload
+from .serializers import ChangePasswordSerializer, LoginSerializer, RegisterSerializer, session_payload
 
 
 class LoginFailed(APIException):
@@ -47,10 +48,71 @@ class LoginView(APIView):
                 raise LoginFailed("This account has been disabled. Contact the TSCE admin office.", code="account_disabled")
             raise LoginFailed("Incorrect email or password. Please check your details and try again.")
 
+        if user.needs_email_verification:
+            services.send_verification_email(user)
+            raise LoginFailed("Please verify your email address first. We've sent a new verification link to "
+                              f"{user.email}.", code="email_unverified")
+
         login(request, user)
         # "Keep me signed in" off → session ends when the browser closes.
         request.session.set_expiry(settings.SESSION_COOKIE_AGE if data.validated_data["remember"] else 0)
         return Response({"user": session_payload(user)})
+
+
+@method_decorator(csrf_protect, name="dispatch")
+@method_decorator(sensitive_post_parameters("password"), name="dispatch")
+class RegisterView(APIView):
+    """
+    Create a Student (self) or Parent account. Always answers the same way —
+    "check your email" — so nobody can find out which emails are registered.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "register"
+
+    def post(self, request):
+        data = RegisterSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        d = data.validated_data
+        services.register(d["accountType"], d["fullName"].strip(), d["email"], d["phone"], d["password"])
+        return Response({"ok": True, "email": d["email"]}, status=status.HTTP_201_CREATED)
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class VerifyEmailView(APIView):
+    """POST {token} from the emailed link → verified and signed in (the first time only)."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "verify_email"
+
+    def post(self, request):
+        try:
+            user, newly = services.verify_email(str(request.data.get("token") or ""))
+        except services.InvalidToken as exc:
+            raise LoginFailed(str(exc), code="invalid_token")
+        if not newly:
+            # An old link must not work as a password: already-verified accounts sign in normally.
+            return Response({"user": None, "alreadyVerified": True})
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        return Response({"user": session_payload(user), "alreadyVerified": False})
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class ResendVerificationView(APIView):
+    """POST {email} → a fresh link if that account still needs one. Same answer either way."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "verify_email"
+
+    def post(self, request):
+        email = str(request.data.get("email") or "").strip().lower()
+        user = User.objects.filter(email__iexact=email, is_active=True).first() if email else None
+        if user and user.needs_email_verification:
+            services.send_verification_email(user)
+        return Response({"ok": True})
 
 
 class LogoutView(APIView):

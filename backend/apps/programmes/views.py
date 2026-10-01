@@ -28,11 +28,12 @@ def public_settings(s: SiteSettings) -> dict:
             "closes": iso(cohort and cohort.enrolment_closes),
             "earlyBirdDeadline": iso(cohort and cohort.early_bird_deadline),
             "acceptingApplications": s.accepting_applications,
+            "applicationFee": s.application_fee,
             "open": state.open,
             "closedMessage": state.message,
         },
         "discounts": {
-            "earlybird": s.early_bird_pct, "excellence": s.excellence_pct, "scholarshipMax": s.scholarship_max_pct,
+            "earlybird": s.early_bird_pct, "excellence": s.excellence_pct,
             "excellenceMinYear": s.excellence_min_waec_year, "excellenceMinAs": s.excellence_min_as,
             "earlyBirdOpen": early_bird_open(cohort),
         },

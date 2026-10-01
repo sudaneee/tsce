@@ -34,7 +34,7 @@ class SeedSchoolTests(TestCase):
 
         s = SiteSettings.load()
         self.assertEqual(s.institution_name, "Trust Skills Center of Excellence")
-        self.assertEqual((s.early_bird_pct, s.excellence_pct, s.scholarship_max_pct), (15, 50, 40))
+        self.assertEqual((s.early_bird_pct, s.excellence_pct, s.application_fee), (15, 50, 5000))
         self.assertEqual(s.current_cohort.start_date, date(2026, 10, 12))
         self.assertEqual(s.current_cohort.early_bird_deadline, date(2026, 10, 1))
 

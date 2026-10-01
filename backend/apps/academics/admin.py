@@ -13,9 +13,9 @@ class EnrollmentInline(admin.TabularInline):
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
     list_display = ["student_no", "full_name", "phone", "state", "created_at"]
-    search_fields = ["student_no", "first_name", "last_name", "user__email", "phone"]
+    search_fields = ["student_no", "first_name", "last_name", "email", "user__email", "guardian__email", "phone"]
     readonly_fields = ["student_no", "created_at", "updated_at"]
-    autocomplete_fields = ["user"]
+    autocomplete_fields = ["user", "guardian"]
     inlines = [EnrollmentInline]
 
 

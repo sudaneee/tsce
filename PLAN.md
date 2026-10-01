@@ -15,6 +15,26 @@ Turning the approved frontend demo (HTML/CSS/JS + localStorage) into a productio
 | Instructors | Instructors do **not** log in. Admin/staff enter attendance and results. Roles: `applicant`, `student`, `staff`, `admin`. |
 | Initial data | Production starts **empty** of people, applications and payments. Seeded: school info (settings) and the 11 real programmes from the flyer. A separate `seed_demo` command exists only for a demo/staging instance. |
 
+## Revised admissions flow (decided 1 Oct 2026, replaces the demo's "pay full fee on applying")
+
+```
+Register (Student account for yourself, or Parent account for your children)
+  → verify email (link sent by email)
+  → fill application (a parent adds one application per child)
+  → pay the APPLICATION FEE (₦5,000 + ₦300 Zainpay charge, non-refundable, one per application)
+  → ┬─ no award requested:  ADMITTED automatically → pay PROGRAMME FEE → ENROLLED
+    └─ Excellence Award requested (WAEC 2020+ with 5 A's): AWAITING VERIFICATION
+         → applicant visits TSCE with the result → staff approve (50%) or decline the award
+         → ADMITTED (award approved: 50% off; declined: normal price) → pay programme fee → ENROLLED
+```
+
+- **Two payments:** the application fee, and the programme fee (₦45,000/₦50,000). Discounts apply only to the programme fee and don't stack (highest wins): an approved Excellence Award (50%) or the early bird (15%, judged on the programme-fee payment date).
+- **The Performance Scholarship no longer exists.** Qualifying applicants may skip the award and be admitted automatically.
+- **Seats** are only taken when the programme fee is paid. There's no automatic lapse of unpaid admissions (staff can reject manually).
+- **Accounts:** email + password, email must be verified before applying. A Parent account manages everything for its children (applications, payments, and later the child's portal view). A self-applicant's account becomes their student login on enrolment.
+- **Refunds** are only needed for mistakes such as a double payment. No award refunds, since awards are decided before the programme fee is paid.
+- **Email:** Gmail SMTP with an app password, configured in `.env` (same setup as the Glittering project). Emails are printed to the console in development until it's configured.
+
 ## Architecture
 
 ```
@@ -59,7 +79,7 @@ All amounts are whole naira. Display numbers (`TSCE/APP/2026/00001` and so on) c
 |---|---|---|
 | core | **SiteSettings** | Singleton (pk=1). Institution info, certificate signatory, `current_cohort`, `accepting_applications`, discount % and Excellence criteria, payment ref prefix and channels, notification toggles. Gateway keys stay in `.env`. |
 | core | **Sequence** | Named counters (`app`, `tx`, `student`, `cert`, `ticket`). |
-| accounts | **User** | Email login (stored lower-case, case-insensitive), `full_name`, `role` (`applicant/student/staff/admin`). `is_staff` means Django admin access only. |
+| accounts | **User** | Email login (stored lower-case, case-insensitive), `full_name`, `phone`, `role` (`applicant/parent/student/staff/admin`), `email_verified_at`. `is_staff` means Django admin access only. |
 | accounts | **StaffProfile** | `staff_no`, title, department, status. `user` is optional: **instructors have no login**. |
 | programmes | **Programme** | `slug` is the public id (`fullstack`), plus code, fee, weeks, capacity, nullable `instructor`, status, presentation fields, JSON lists (outcomes, audience, careers, requirements, schedules). Seats taken are computed from enrolments. |
 | programmes | **Module** | Ordered per programme. Re-seeding renames in place, so results stay attached. |
@@ -67,9 +87,9 @@ All amounts are whole naira. Display numbers (`TSCE/APP/2026/00001` and so on) c
 | admissions | **Application** | A snapshot of the applicant's submission, the WAEC file in **private storage**, programme, cohort, schedule, fee and discount fields, `status` (`Pending/Under Review/Accepted/Enrolled/Rejected`) and a separate `payment_status` (`Unpaid/Pending/Paid/Failed/Refunded`). The demo's "Paid" status maps to `payment_status`. |
 | admissions | **ApplicationEvent** | The timeline (text, ok, actor). |
 | admissions | **AwardRequest** | One per application. Excellence or scholarship; requested/awarded %, interview score, evidence, review fields. |
-| payments | **Payment** | `kind` is charge or refund. A refund **must** have a `parent` charge (DB constraint). Also stores status, channel, gateway, `gateway_ref`, `checkout_url`, `gateway_payload`, and verification and refund timestamps. Read-only in admin. |
+| payments | **Payment** | `purpose` is `application_fee` or `programme_fee`; `kind` is charge or refund. A refund **must** have a `parent` charge (DB constraint). Also stores status, channel, gateway, `gateway_ref`, `checkout_url`, `gateway_payload`, and verification and refund timestamps. Read-only in admin. |
 | payments | **WebhookEvent** | Every webhook is stored raw before processing, with signature validity and processed/error fields. |
-| academics | **Student** | The person, one per user. `student_no` and contact details (editable by the student) are copied from the application when payment is confirmed. |
+| academics | **Student** | The enrolled person, created when the programme fee is paid. Either `user` (a self-applicant's own login) or `guardian` (the parent account, for a child with no login). |
 | academics | **Enrollment** | Student × programme × cohort (unique). Schedule, dates, status, a single `progress` %, and `amount_paid`. **Per-module progress is derived** from `progress`, so there's no per-module table to maintain. |
 | academics | **AttendanceSession / AttendanceRecord** | One session per programme, cohort and day. One mark per enrolment per session. |
 | academics | **Result** | One per enrolment and module. The grade is computed on save. Draft or Published. |
@@ -146,16 +166,32 @@ Permissions: `IsApplicant`, `IsStudent`, `IsStaff` (staff+admin), `IsAdmin`. Stu
 - [ ] **Sandbox run with TSCE's real Zainpay keys** (card + transfer, webhook delivery to a public URL, reconcile). Confirm: `paymentChannels` values, the webhook event names, and that the paid amount is enforced on transfers.
 
 **Phase 5 — Staff admissions & finance**
-- [ ] Applications list/filters/detail drawer/lifecycle actions/print
-- [ ] Award (Excellence/Scholarship) review with refund calculation
-- [ ] Payments list, verify pending transfer, refund, reminders
-- [ ] Staff accounts management + admin password reset; Settings page (admissions dates, early-bird deadline, accepting applications)
+- [x] Staff dashboard on live numbers: applications by status, admitted, enrolled, awards to verify, money collected, seats taken per programme, latest applications
+- [x] Applications: filters, search, status chips, CSV export, detail drawer (applicant + parent account, fees, payments, history, private WAEC result), send reminder, reject (with reason, emailed)
+- [x] Excellence Awards: verification queue → approve (50%) / decline → admitted either way
+- [x] Payments: every transaction, both fees, duplicates flagged, "Check with Zainpay", **record refund** (duplicates only, after a manual bank transfer), receipts, CSV
+- [x] Staff accounts (admin): add with or without login (instructors), temporary password + forced change, edit, deactivate, reset password; no self-lockout
+- [x] Settings (admin): institution, admissions calendar + application fee, discounts, notifications, start a new intake; gateway and email shown read-only (they're set in `.env`)
+- [x] Notification bell and Ctrl K search on the server; sidebar badges for awards to verify and duplicate payments
+- [x] Staff pages not yet on the API (students, programmes, attendance, assessments, certificates, announcements, reports) are marked "soon" and show "Coming soon" instead of demo data
+- [x] Tests: 84 unit tests; browser suite `staff` (28 checks)
 
 **Phase 5b — Demo/staging data**
 - [ ] `seed_demo` command (staging only): builds demo applicants, payments and students by calling the real services
 
+**Phase 3b — Accounts, email verification & two-step admissions** (rework of Phases 3–4 for the revised flow)
+- [x] Register as Student (self) or Parent → verification email (signed link, 48 h) → verify signs you in once; login refused until verified (a new link is sent); resend; nothing reveals whether an email is registered
+- [x] Email via Gmail SMTP with an app password (same as Glittering), best-effort sending; console in development. Key admissions events are emailed as well as notified in-app.
+- [x] Applications belong to the signed-in account; a parent applies per child (child's email optional); duplicates checked per child + programme + cohort
+- [x] Application fee (₦5,000 setting, + ₦300 Zainpay charge) → **auto-admitted**, or **Awaiting Verification** for an Excellence Award request
+- [x] Staff award decision `POST /api/staff/applications/{no}/award` (approve → 50%, decline → full price; admits either way). Staff screen in Phase 5.
+- [x] Programme fee (re-priced at payment: best of award / early bird) → **Enrolled**, student number, seat taken; parent-managed children have no login of their own (`Student.guardian`)
+- [x] Performance Scholarship removed everywhere (model, settings, UI, public pages)
+- [x] Pages: register, verify-email, My applications (per child: progress tracker + next action); wizard, payment and success pages handle both fees
+- [x] Tests: 72 unit tests; browser suites auth, public, payments, **journey** (register → verify → two children → award approval → both enrolled)
+
 **Before go-live (carried from earlier phases)**
-- [ ] Staff portal pages not yet wired to the API still show the old browser demo data. At launch, hide or disable every page that isn't wired yet (students, attendance, assessments, certificates, reports, etc.).
+- [x] Staff portal pages not yet wired to the API are disabled ("Coming soon") instead of showing demo data.
 - [ ] Student portal shows an "almost ready" placeholder until Phase 7. Decide what paid students see at launch (at minimum: admission status + receipt).
 
 **Phase 6 — Deploy (VPS)**

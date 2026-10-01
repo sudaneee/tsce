@@ -18,20 +18,19 @@ def waec_upload_path(instance, filename):
 class DiscountType(models.TextChoices):
     EARLY_BIRD = "earlybird", "Early Bird Discount"
     EXCELLENCE = "excellence", "Excellence Award"
-    SCHOLARSHIP = "scholarship", "Performance Scholarship"
 
 
 class Application(TimeStampedModel):
     class Status(models.TextChoices):
-        PENDING = "Pending"
-        UNDER_REVIEW = "Under Review"
-        ACCEPTED = "Accepted"
-        ENROLLED = "Enrolled"
+        PENDING = "Pending"                                  # submitted, application fee not paid yet
+        AWAITING_VERIFICATION = "Awaiting Verification"      # fee paid; Excellence Award to verify in person
+        ADMITTED = "Admitted"                                # may now pay the programme fee
+        ENROLLED = "Enrolled"                                # programme fee paid
         REJECTED = "Rejected"
 
     class PaymentStatus(models.TextChoices):
+        """Status of the PROGRAMME fee (the application fee has its own paid-at stamp)."""
         UNPAID = "Unpaid"
-        PENDING = "Pending"      # bank transfer started, not yet confirmed
         PAID = "Paid"
         FAILED = "Failed"
         REFUNDED = "Refunded"
@@ -46,16 +45,17 @@ class Application(TimeStampedModel):
         NOT_APPLICABLE = "Not Applicable"
 
     number = models.CharField(max_length=30, unique=True)  # TSCE/APP/2026/00001
+    # The account that applied and pays: the applicant themselves, or their parent.
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="applications")
 
-    # Personal (a snapshot of what the applicant submitted)
+    # The person applying (a snapshot of what was submitted)
     first_name = models.CharField(max_length=60)
     middle_name = models.CharField(max_length=60, blank=True)
     last_name = models.CharField(max_length=60)
     gender = models.CharField(max_length=10, choices=Gender.choices)
     dob = models.DateField("date of birth")
     phone = models.CharField(max_length=30)
-    email = models.EmailField(db_index=True)
+    email = models.EmailField(blank=True, db_index=True, help_text="The applicant's own email (optional for children)")
     address = models.CharField(max_length=300)
     state = models.CharField(max_length=40)
     lga = models.CharField("LGA", max_length=80)
@@ -77,14 +77,18 @@ class Application(TimeStampedModel):
     cohort = models.ForeignKey("programmes.Cohort", on_delete=models.PROTECT, related_name="applications")
     schedule = models.CharField(max_length=80)
 
-    # Fees (naira) — fixed when the application is created / an award is approved
+    # Application fee (naira): paid first, non-refundable
+    application_fee = models.PositiveIntegerField(default=5000)
+    application_fee_paid_at = models.DateTimeField(null=True, blank=True)
+
+    # Programme fee (naira): re-quoted at checkout (the early bird depends on the payment date)
     fee = models.PositiveIntegerField()
     discount_type = models.CharField(max_length=20, choices=DiscountType.choices, blank=True)
     discount_pct = models.PositiveSmallIntegerField(default=0)
     discount_amount = models.PositiveIntegerField(default=0)
     amount_payable = models.PositiveIntegerField()
 
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING, db_index=True)
     payment_status = models.CharField(
         max_length=10, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID, db_index=True
     )
@@ -118,11 +122,10 @@ class ApplicationEvent(models.Model):
 
 
 class AwardRequest(TimeStampedModel):
-    """An Excellence Award or Performance Scholarship request, reviewed by staff."""
+    """An Excellence Award request. The applicant brings their WAEC/NECO result to TSCE; staff decide."""
 
     class Type(models.TextChoices):
         EXCELLENCE = DiscountType.EXCELLENCE
-        SCHOLARSHIP = DiscountType.SCHOLARSHIP
 
     class Status(models.TextChoices):
         PENDING = "Pending"
@@ -133,7 +136,6 @@ class AwardRequest(TimeStampedModel):
     type = models.CharField(max_length=20, choices=Type.choices)
     requested_pct = models.PositiveSmallIntegerField()
     awarded_pct = models.PositiveSmallIntegerField(null=True, blank=True)
-    interview_score = models.PositiveSmallIntegerField(null=True, blank=True, validators=[MaxValueValidator(100)])
     evidence = models.CharField(max_length=300, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING, db_index=True)
     note = models.CharField(max_length=300, blank=True)

@@ -203,6 +203,7 @@ const Payments = (() => {
 Pages["payment"] = async function () {
     const wrap = UI.$("#payRoot");
     const number = UI.param("app"), result = UI.param("result"), lastRef = UI.param("ref");
+    const wanted = UI.param("purpose");
     const user = Auth.current();
     const pset = Site.settings?.payments || {};
     const card = (opts) => `<div class="card">${UI.empty(opts)}</div>`;
@@ -216,10 +217,7 @@ Pages["payment"] = async function () {
         return;
     }
     const appNo = number || user.applicationId;
-    if (!appNo) {
-        wrap.innerHTML = card({ icon: "fa-file-invoice", title: "No application to pay for", text: "Start an application to generate an invoice and pay securely with Zainpay.", action: `<a class="btn btn-primary" href="application.html">Start application</a>` });
-        return;
-    }
+    if (!appNo) { location.replace("my-applications.html"); return; }
 
     wrap.innerHTML = `<div class="card">${UI.skeleton(5)}</div>`;
     let app;
@@ -228,18 +226,37 @@ Pages["payment"] = async function () {
         wrap.innerHTML = card({ icon: "fa-file-circle-xmark", title: e.status === 404 ? "Application not found" : "Couldn't load your invoice", text: e.status === 404 ? `We couldn't find ${UI.esc(appNo)} on the account you're signed in with (${UI.esc(user.email)}).` : UI.esc(e.message), action: `<a class="btn btn-primary" href="application.html">Start application</a>` });
         return;
     }
-    if (app.paymentStatus === "Paid") {
-        wrap.innerHTML = card({ icon: "fa-circle-check", title: "This application has already been paid", text: `Application ${UI.esc(app.id)} was paid on ${UI.date(app.paidAt)}.`, action: `<a class="btn btn-primary" href="success.html?ref=${encodeURIComponent(app.txRef || "")}">View confirmation</a>` });
-        return;
-    }
+    const mine = `<a class="btn btn-primary" href="my-applications.html">My applications</a>`;
     if (app.status === "Rejected") {
-        wrap.innerHTML = card({ icon: "fa-circle-xmark", title: "This application was not successful", text: "It can no longer be paid. Contact the admissions office if you have questions.", action: `<a class="btn btn-primary" href="contact.html">Contact admissions</a>` });
+        wrap.innerHTML = card({ icon: "fa-circle-xmark", title: "This application was not successful", text: "It can no longer be paid. Contact the admissions office if you have questions.", action: mine });
         return;
     }
+    // Which fee: as asked, or the next one due.
+    const purpose = wanted || (app.applicationFeePaidAt ? "programme_fee" : "application_fee");
+    if (purpose === "application_fee" && app.applicationFeePaidAt) {
+        wrap.innerHTML = card({ icon: "fa-circle-check", title: "The application fee is already paid", text: `Paid on ${UI.date(app.applicationFeePaidAt)}. Follow the next step from My applications.`, action: mine });
+        return;
+    }
+    if (purpose === "programme_fee") {
+        if (app.paymentStatus === "Paid") {
+            wrap.innerHTML = card({ icon: "fa-circle-check", title: "The programme fee is already paid", text: `${UI.esc(app.name)} is enrolled.`, action: `<a class="btn btn-primary" href="success.html?ref=${encodeURIComponent(app.txRef || "")}&fresh=0">View confirmation</a>` });
+            return;
+        }
+        if (app.status === "Pending") {
+            wrap.innerHTML = card({ icon: "fa-file-invoice", title: "Pay the application fee first", text: "The programme fee is paid after admission.", action: `<a class="btn btn-primary" href="payment.html?app=${encodeURIComponent(app.id)}&purpose=application_fee">Pay application fee</a>` });
+            return;
+        }
+        if (app.status === "Awaiting Verification") {
+            wrap.innerHTML = card({ icon: "fa-id-card", title: "Excellence Award verification pending", text: `Bring the original WAEC/NECO result to TSCE (${UI.esc(Site.settings?.institution?.address || "")}). You can pay the programme fee once admissions has verified it.`, action: mine });
+            return;
+        }
+    }
+    const isAppFee = purpose === "application_fee";
+    const due = isAppFee ? app.applicationFee : app.amountPayable;
 
     const prog = Programmes.get(app.programmeId) || { name: app.programmeName, weeks: "", color: "#1846D6", icon: "fa-layer-group" };
     const env = pset.environment;
-    const charge = pset.payerCharge || 0, total = app.amountPayable + charge;
+    const charge = pset.payerCharge || 0, total = due + charge;
     const methods = [pset.allowCard !== false && ["fa-regular fa-credit-card", "Card", "Visa, Mastercard, Verve"], pset.allowTransfer !== false && ["fa-solid fa-building-columns", "Bank transfer", "Pay from any Nigerian bank app"]].filter(Boolean);
     const alerts = {
         failed: `<div class="alert danger mb-2" role="alert"><i class="fa-solid fa-circle-xmark"></i><p><b>Your last payment didn't go through.</b> No money was taken for it. You can try again below, with another card or by bank transfer.</p></div>`,
@@ -263,7 +280,7 @@ Pages["payment"] = async function () {
         </div>
         <aside class="order-summary">
             <div class="card card-pad">
-                <div class="flex between mb-2"><h3 class="mb-0" style="font-size:1.05rem">Order summary</h3>${UI.badge(app.paymentStatus === "Failed" ? "Failed" : "Pending Payment")}</div>
+                <div class="flex between mb-2"><h3 class="mb-0" style="font-size:1.05rem">${isAppFee ? "Application fee" : "Programme fee"}</h3>${UI.badge(result === "failed" ? "Failed" : "Pending Payment")}</div>
                 <div class="flex mb-2" style="align-items:flex-start"><span class="icon-tile" style="background:${prog.color};color:#fff"><i class="fa-solid ${prog.icon}"></i></span><div><strong style="font-family:var(--font-head)">${UI.esc(app.programmeName)}</strong><div class="small muted">${prog.weeks ? prog.weeks + " weeks · " : ""}${UI.esc(app.intake)}</div></div></div>
                 <div class="bank-box" style="margin-bottom:14px">
                     <div class="row"><span class="muted">Applicant</span><strong>${UI.esc(app.name)}</strong></div>
@@ -271,14 +288,14 @@ Pages["payment"] = async function () {
                     <div class="row"><span class="muted">Schedule</span><strong style="font-size:.84rem;text-align:right">${UI.esc(app.schedule)}</strong></div>
                 </div>
                 <div class="fee-box">
-                    <div class="fee-row"><span>Programme Fee</span><span>${UI.naira(app.fee)}</span></div>
-                    ${app.discountAmount ? `<div class="fee-row"><span>${Applications.discountName(app.discountType)} (${app.discountPct}%)</span><span class="neg">−${UI.naira(app.discountAmount)}</span></div>` : ""}
-                    <div class="fee-row total"><span>Amount Payable</span><span>${UI.naira(app.amountPayable)}</span></div>
+                    ${isAppFee ? `<div class="fee-row"><span>Application fee (non-refundable)</span><span>${UI.naira(app.applicationFee)}</span></div>` : `<div class="fee-row"><span>Programme Fee</span><span>${UI.naira(app.fee)}</span></div>
+                    ${app.discountAmount ? `<div class="fee-row"><span>${Applications.discountName(app.discountType)} (${app.discountPct}%)</span><span class="neg">−${UI.naira(app.discountAmount)}</span></div>` : ""}`}
+                    <div class="fee-row total"><span>Amount Payable</span><span>${UI.naira(due)}</span></div>
                     ${charge ? `<div class="fee-row"><span>Zainpay transaction charge</span><span>${UI.naira(charge)}</span></div><div class="fee-row total"><span>Total to pay</span><span>${UI.naira(total)}</span></div>` : ""}
                 </div>
-                ${app.awardRequest?.status === "Pending" ? `<div class="alert mt-2"><i class="fa-solid fa-award"></i><p>Your <b>${Applications.discountName(app.awardRequest.type)}</b> request will be reviewed by admissions. If approved, the difference is refunded to you.</p></div>` : ""}
+                ${isAppFee && app.awardRequest?.status === "Pending" ? `<div class="alert mt-2"><i class="fa-solid fa-award"></i><p>After paying, bring the original WAEC/NECO result to TSCE to verify the <b>Excellence Award</b>. Admission is confirmed after verification.</p></div>` : ""}
                 <div class="flex mt-2 small muted"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Instant confirmation & e-receipt</div>
-                <div class="flex mt-1 small muted"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Student portal activated after payment</div>
+                <div class="flex mt-1 small muted"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> ${isAppFee ? (app.awardRequest ? "Then: award verification at TSCE" : "Then: automatic admission") : "Enrolment confirmed after payment"}</div>
             </div>
         </aside></div>`;
 
@@ -286,8 +303,8 @@ Pages["payment"] = async function () {
     payBtn.onclick = async () => {
         payBtn.disabled = true; payBtn.innerHTML = `<span class="spinner"></span> Connecting to Zainpay…`;
         try {
-            const r = await API.post("payments/initialize", { applicationId: app.id });
-            if (r.amount !== app.amountPayable) {
+            const r = await API.post("payments/initialize", { applicationId: app.id, purpose });
+            if (r.amount !== due) {
                 const go = await UI.confirm({ title: "Amount updated", message: `The early-bird period has ended, so the amount payable is now <b>${UI.naira(r.amount)}</b>${charge ? ` (plus the ${UI.naira(charge)} Zainpay charge)` : ""}.`, confirmText: `Pay ${UI.naira(r.amount + charge)}`, icon: "fa-circle-info" });
                 if (!go) { location.reload(); return; }
             }
@@ -307,7 +324,7 @@ Pages["payment"] = async function () {
             try {
                 const p = await API.post(`payments/${encodeURIComponent(lastRef)}/check`);
                 if (p.status === "SUCCESS") { location.href = `success.html?ref=${encodeURIComponent(p.ref)}`; return; }
-                if (p.status === "FAILED") { location.href = `payment.html?app=${encodeURIComponent(app.id)}&result=failed`; return; }
+                if (p.status === "FAILED") { location.href = `payment.html?app=${encodeURIComponent(app.id)}&purpose=${purpose}&result=failed`; return; }
                 if (manual) UI.toast("Still processing", "Zainpay hasn't confirmed this payment yet. We'll keep checking.", "info");
             } catch (e) { if (manual) UI.toast("Couldn't check", e.message, "warning"); }
             finally { busy = false; }
@@ -330,154 +347,58 @@ Pages["success"] = async function () {
     let pay, app;
     try {
         pay = await API.get(`payments/${encodeURIComponent(ref)}`);
-        if (pay.status !== "SUCCESS") { location.replace(`payment.html?app=${encodeURIComponent(pay.applicationId || "")}&ref=${encodeURIComponent(ref)}&result=${pay.status === "FAILED" ? "failed" : "pending"}`); return; }
+        if (pay.status !== "SUCCESS") { location.replace(`payment.html?app=${encodeURIComponent(pay.applicationId || "")}&purpose=${pay.purpose}&ref=${encodeURIComponent(ref)}&result=${pay.status === "FAILED" ? "failed" : "pending"}`); return; }
         app = await API.get("applications/" + encodeURIComponent(pay.applicationId));
     } catch (e) {
         return empty({ icon: "fa-receipt", title: "We couldn't load this confirmation", text: UI.esc(e.message), action: `<a class="btn btn-primary" href="../index.html">Back to home</a>` });
     }
     const start = Site.day(app.cohortStart);
+    const isAppFee = pay.purpose === "application_fee";
+    const parentAcct = Auth.current()?.role === "parent";
+    const charge = Site.settings?.payments?.payerCharge || 0;
+    const headline = isAppFee
+        ? (app.status === "Awaiting Verification" ? "APPLICATION FEE PAID" : "APPLICATION FEE PAID — ADMITTED")
+        : "ENROLMENT CONFIRMED";
+    const intro = isAppFee
+        ? (app.status === "Awaiting Verification"
+            ? `Thank you. The application for ${UI.esc(app.name)} is complete. <b>Next: bring the original WAEC/NECO result to TSCE</b> (${UI.esc(Site.settings?.institution?.address || "")}) to verify the Excellence Award.`
+            : `Congratulations — ${UI.esc(app.name)} has been <b>admitted</b> to ${UI.esc(app.programmeName)}. Pay the programme fee to secure ${parentAcct ? "the" : "your"} seat.`)
+        : `Thank you. ${UI.esc(app.name)} is enrolled${pay.studentId ? ` — student number <b>${UI.esc(pay.studentId)}</b>` : ""}.`;
+    const primary = isAppFee
+        ? (app.status === "Admitted"
+            ? `<a class="btn btn-grad" href="payment.html?app=${encodeURIComponent(app.id)}&purpose=programme_fee"><i class="fa-solid fa-lock"></i> Pay programme fee · ${UI.naira(app.amountPayable + charge)}</a>`
+            : `<a class="btn btn-primary" href="my-applications.html">My applications</a>`)
+        : (parentAcct ? `<a class="btn btn-primary" href="my-applications.html">My applications</a>` : `<a class="btn btn-primary" href="student/dashboard.html"><i class="fa-solid fa-user-graduate"></i> Go to Student Portal</a>`);
     box.innerHTML = `<div class="success-card">
         <div class="success-top"><div class="success-mark"><svg viewBox="0 0 52 52"><path d="M14 27l8 8 16-17"/></svg></div>
             <span class="badge badge-success mb-2">Payment verified</span>
-            <h1>APPLICATION SUBMITTED SUCCESSFULLY</h1>
-            <p class="muted" style="max-width:560px;margin:0 auto 12px">Thank you, ${UI.esc(app.firstName)}. Your application and payment have been received. Your student portal account is now active${pay.studentId ? ` — your student number is <b>${UI.esc(pay.studentId)}</b>` : ""}.</p>
+            <h1>${headline}</h1>
+            <p class="muted" style="max-width:560px;margin:0 auto 12px">${intro}</p>
             <div class="app-no"><div><small>Application Number</small><br><strong>${UI.esc(app.id)}</strong></div><button class="icon-btn" id="copyApp" aria-label="Copy application number"><i class="fa-regular fa-copy"></i></button></div>
         </div>
         <div class="success-details">
             <div><small>Applicant</small><strong>${UI.esc(app.name)}</strong></div>
             <div><small>Programme</small><strong>${UI.esc(app.programmeName)}</strong></div>
             <div><small>Cohort</small><strong>${UI.esc(app.intake)}</strong></div>
-            <div><small>Payment status</small>${UI.badge("Paid")}</div>
-            <div><small>Application status</small>${UI.badge(app.status === "Pending" ? "Submitted" : app.status)}</div>
+            <div><small>Paid for</small><strong>${isAppFee ? "Application fee" : "Programme fee"}</strong></div>
+            <div><small>Application status</small>${UI.badge(app.status)}</div>
             <div><small>Transaction reference</small><strong class="mono" style="font-size:.82rem">${UI.esc(pay.ref)}</strong></div>
             <div><small>Amount paid</small><strong>${UI.naira(pay.amount)}</strong></div>
-            <div><small>Discount</small><strong>${app.discountAmount ? `${Applications.discountName(app.discountType)} (−${UI.naira(app.discountAmount)})` : "None"}</strong></div>
+            ${isAppFee ? "" : `<div><small>Discount</small><strong>${app.discountAmount ? `${Applications.discountName(app.discountType)} (−${UI.naira(app.discountAmount)})` : "None"}</strong></div>`}
             <div><small>Classes begin</small><strong>${UI.dateLong(start)}</strong></div>
         </div>
         <div class="success-actions no-print">
             <button class="btn btn-outline" id="dlReceipt"><i class="fa-solid fa-download"></i> Download Receipt</button>
             <button class="btn btn-outline" id="printApp"><i class="fa-solid fa-print"></i> Print Application</button>
-            <a class="btn btn-primary" href="student/dashboard.html"><i class="fa-solid fa-user-graduate"></i> Go to Student Portal</a>
-        </div></div>
-        <div class="next-steps no-print">
-            <div class="card card-pad"><span class="icon-tile"><i class="fa-solid fa-receipt"></i></span><h4 class="mt-2">Keep your receipt</h4><p class="small muted mb-0">Download it now. It's also available any time in your student portal.</p></div>
-            <div class="card card-pad"><span class="icon-tile cyan"><i class="fa-solid fa-magnifying-glass"></i></span><h4 class="mt-2">Admission review</h4><p class="small muted mb-0">The admissions office will review your application and notify you in your portal.</p></div>
-            <div class="card card-pad"><span class="icon-tile gold"><i class="fa-solid fa-calendar-check"></i></span><h4 class="mt-2">Get ready</h4><p class="small muted mb-0">Classes start on ${UI.date(start)}. Watch your portal for orientation details.</p></div>
-        </div>`;
+            ${primary}
+        </div></div>`;
     if (UI.param("fresh") !== "0") UI.confetti();
     UI.$("#copyApp").onclick = () => UI.copy(app.id);
     UI.$("#dlReceipt").onclick = () => Payments.showReceipt(pay);
     UI.$("#printApp").onclick = () => UI.printHTML(`Application ${app.id}`, Applications.printHTML(app));
 };
 
-/* ---------------- Staff: Payment management ---------------- */
-Pages["staff-payments"] = function (view) {
-    let statusFilter = UI.param("status") || "";
-    view.innerHTML = `
-        <div class="view-head"><div><h2>Payments & Transactions</h2><p>All Zainpay transactions — verify pending transfers, issue refunds and print receipts.</p></div>
-            <div class="actions"><button class="btn btn-primary" id="expPay"><i class="fa-solid fa-file-csv"></i> Export CSV</button></div></div>
-        <div class="kpis" id="payKpis"></div>
-        <div class="dash-grid cols-12" style="margin-bottom:20px">
-            <div class="panel span-8"><div class="panel-head"><div><h3><i class="fa-solid fa-chart-column"></i>Daily collections</h3><p>Successful Zainpay payments — last 21 days</p></div></div><div class="panel-body"><div class="chart-box sm"><canvas id="payDaily"></canvas></div></div></div>
-            <div class="panel span-4"><div class="panel-head"><h3><i class="fa-solid fa-wallet"></i>By channel</h3></div><div class="panel-body"><div class="chart-box sm"><canvas id="payChannel"></canvas></div></div></div>
-        </div>
-        <div class="panel">
-            <div class="table-tools"><div class="input-icon"><i class="fa-solid fa-magnifying-glass"></i><input class="input" id="tSearch" placeholder="Search name, reference, application…" aria-label="Search transactions"></div>
-                <select class="select" id="tStatus" aria-label="Status"><option value="">All statuses</option><option>SUCCESS</option><option>PENDING</option><option>FAILED</option><option>REFUNDED</option></select>
-                <select class="select" id="tChannel" aria-label="Channel"><option value="">All channels</option><option value="card">Card</option><option value="transfer">Bank Transfer</option><option value="virtual">Virtual Account</option></select>
-                <select class="select" id="tProg" aria-label="Programme"><option value="">All programmes</option>${Programmes.all().map((p) => `<option value="${p.id}">${UI.esc(p.name)}</option>`).join("")}</select></div>
-            <div id="payTable"></div></div>`;
-    UI.$("#tStatus").value = statusFilter;
-
-    function kpis() {
-        const ps = Payments.all(); const base = DB.settings().baselines || {};
-        const sum = (s) => ps.filter((p) => p.status === s).reduce((a, p) => a + p.amount, 0);
-        const cnt = (s) => ps.filter((p) => p.status === s).length;
-        UI.$("#payKpis").innerHTML = [
-            ["Total revenue", UI.naira(sum("SUCCESS") + (base.revenue || 0)), "fa-naira-sign", "grad", "All-time, incl. archived cohorts"],
-            ["Successful", cnt("SUCCESS"), "fa-circle-check", "green", UI.naira(sum("SUCCESS"), { compact: true }) + " this intake"],
-            ["Pending", cnt("PENDING"), "fa-hourglass-half", "gold", UI.naira(sum("PENDING")) + " awaiting"],
-            ["Failed", cnt("FAILED"), "fa-circle-xmark", "red", "Needs follow-up"],
-            ["Refunded", cnt("REFUNDED"), "fa-rotate-left", "cyan", UI.naira(sum("REFUNDED")) + " returned"]
-        ].map(([l, v, i, c, n], k) => `<div class="kpi ${k === 0 ? "" : ""}" data-kfilter="${["", "SUCCESS", "PENDING", "FAILED", "REFUNDED"][k]}" style="cursor:pointer"><div class="kpi-top"><p class="label">${l}</p><span class="icon-tile ${c}"><i class="fa-solid ${i}"></i></span></div><div class="value">${v}</div><div class="small muted mt-1">${n}</div></div>`).join("");
-        UI.$$("[data-kfilter]").forEach((k) => k.onclick = () => { UI.$("#tStatus").value = k.dataset.kfilter; refresh(); });
-    }
-    const table = UI.dataTable("#payTable", {
-        pageSize: 10, onRowClick: (id) => detail(id),
-        columns: [
-            { key: "ref", label: "Transaction", render: (p) => `<span class="ref">${UI.esc(p.ref)}</span>` },
-            { key: "name", label: "Student", render: (p) => `<div class="person">${UI.avatar(p.name, "sm")}<div><strong>${UI.esc(p.name)}</strong><small>${UI.esc(p.studentId || p.applicationId || "")}</small></div></div>` },
-            { key: "programmeId", label: "Programme", render: (p) => `<span class="small">${UI.esc(Programmes.name(p.programmeId))}</span>` },
-            { key: "amount", label: "Amount", cls: "num", render: (p) => `<b>${UI.naira(p.amount)}</b>` },
-            { key: "gateway", label: "Gateway", render: (p) => `<span class="small"><i class="fa-solid fa-bolt" style="color:var(--secondary)"></i> Zainpay · ${Payments.CHANNEL[p.channel] || "Card"}</span>` },
-            { key: "status", label: "Status", render: (p) => UI.badge(p.status) },
-            { key: "createdAt", label: "Date", render: (p) => `<span class="small">${UI.dateTime(p.createdAt)}</span>` }
-        ],
-        mobile: (p) => `<div class="m-row"><strong>${UI.esc(p.name)}</strong>${UI.badge(p.status)}</div><div class="m-row"><span class="ref">${UI.esc(p.ref)}</span><b>${UI.naira(p.amount)}</b></div><div class="m-row"><span>${UI.esc(Programmes.name(p.programmeId))}</span><span>${UI.date(p.createdAt)}</span></div>`
-    });
-    function refresh() {
-        const q = UI.$("#tSearch").value.toLowerCase(), st = UI.$("#tStatus").value, ch = UI.$("#tChannel").value, pr = UI.$("#tProg").value;
-        table.update(Payments.all().filter((p) => (!st || p.status === st) && (!ch || p.channel === ch) && (!pr || p.programmeId === pr) && [p.name, p.ref, p.applicationId, p.studentId, p.email].join(" ").toLowerCase().includes(q)).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)), { resetPage: false });
-        kpis();
-    }
-    function charts() {
-        if (!window.Chart) return;
-        const ps = Payments.all().filter((p) => p.status === "SUCCESS");
-        const days = Array.from({ length: 21 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - 20 + i); return d; });
-        const key = (d) => new Date(d).toISOString().slice(0, 10);
-        const byDay = days.map((d) => ps.filter((p) => key(p.createdAt) === key(d)).reduce((a, p) => a + p.amount, 0) + (Dashboard.seedNoise(key(d)) * 42500));
-        Dashboard.chart("payDaily", { type: "bar", data: { labels: days.map((d) => UI.date(d, { day: "numeric", month: "short" })), datasets: [{ label: "Collections", data: byDay, backgroundColor: "#1846D6", borderRadius: 6, maxBarThickness: 22 }] }, options: { plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => UI.naira(c.raw) } } }, scales: { y: { ticks: { callback: (v) => UI.naira(v, { compact: true }) } } } } });
-        const chs = ["card", "transfer", "virtual"];
-        Dashboard.chart("payChannel", { type: "doughnut", data: { labels: chs.map((c) => Payments.CHANNEL[c]), datasets: [{ data: chs.map((c) => ps.filter((p) => p.channel === c).length), backgroundColor: ["#1846D6", "#06C8E0", "#F5B400"], borderWidth: 0 }] }, options: { cutout: "68%", plugins: { legend: { position: "bottom" } } } });
-    }
-    function detail(ref) {
-        const p = DB.get("payments", ref);
-        const actions = [];
-        if (p.status === "PENDING") actions.push(`<button class="btn btn-success" id="pVerify"><i class="fa-solid fa-shield-halved"></i> Verify with Zainpay</button>`);
-        if (p.status === "SUCCESS") actions.push(`<button class="btn btn-soft-danger" id="pRefund"><i class="fa-solid fa-rotate-left"></i> Refund</button>`);
-        if (p.status === "FAILED") actions.push(`<button class="btn btn-outline" id="pRemind"><i class="fa-regular fa-bell"></i> Send payment reminder</button>`);
-        if (p.status === "SUCCESS" || p.status === "REFUNDED") actions.push(`<button class="btn btn-primary" id="pReceipt"><i class="fa-solid fa-receipt"></i> Receipt</button>`);
-        const d = UI.drawer({
-            title: `Transaction ${UI.badge(p.status)}`, subtitle: `<span class="mono">${UI.esc(p.ref)}</span>`,
-            body: `<div class="dr-section"><h4>Payment</h4><div class="kv">
-                    <div><small>Amount</small><strong style="font-size:1.3rem;font-family:var(--font-head)">${UI.naira(p.amount)}</strong></div>
-                    <div><small>Gateway</small><strong>Zainpay · ${Payments.CHANNEL[p.channel] || "Card"}</strong></div>
-                    <div><small>Programme fee</small><strong>${UI.naira(p.fee || p.amount)}</strong></div>
-                    <div><small>Discount</small><strong>${p.discount ? "−" + UI.naira(p.discount) : "—"}</strong></div>
-                    <div class="full"><small>Description</small><strong>${UI.esc(p.description || "")}</strong></div>
-                    ${p.failureReason ? `<div class="full"><small>Failure reason</small><strong style="color:var(--danger)">${UI.esc(p.failureReason)}</strong></div>` : ""}
-                </div></div>
-                <div class="dr-section"><h4>Customer</h4><div class="kv"><div><small>Name</small><strong>${UI.esc(p.name)}</strong></div><div><small>Email</small><strong>${UI.esc(p.email || "—")}</strong></div>
-                    <div><small>Application</small><strong class="mono">${UI.esc(p.applicationId || "—")}</strong></div><div><small>Student ID</small><strong class="mono">${UI.esc(p.studentId || "—")}</strong></div></div></div>
-                <div class="dr-section"><h4>Gateway timeline</h4><ul class="history">
-                    <li class="ok"><strong>Transaction initialised</strong><small>${UI.dateTime(p.createdAt)}</small></li>
-                    ${p.status === "PENDING" ? `<li><strong>Awaiting confirmation from bank</strong><small>Transfer not yet settled</small></li>` : ""}
-                    ${p.status === "FAILED" ? `<li><strong>Declined by issuer</strong><small>${UI.dateTime(p.verifiedAt || p.createdAt)}</small></li>` : ""}
-                    ${["SUCCESS", "REFUNDED"].includes(p.status) ? `<li class="ok"><strong>Payment approved & verified</strong><small>${UI.dateTime(p.verifiedAt || p.createdAt)}</small></li>` : ""}
-                    ${p.status === "REFUNDED" ? `<li><strong>Refund processed</strong><small>${UI.dateTime(p.refundedAt)}</small></li>` : ""}
-                </ul></div>`,
-            footer: actions.join("") || `<button class="btn btn-ghost" data-close>Close</button>`
-        });
-        UI.$("#pVerify", d.el)?.addEventListener("click", async (e) => {
-            e.target.disabled = true; e.target.innerHTML = `<span class="spinner"></span> Verifying…`;
-            const upd = await PaymentService.verify(ref);
-            if (upd.applicationId && upd.status === "SUCCESS") Applications.markPaid(upd.applicationId, upd, { silent: true });
-            d.close(); UI.toast("Payment verified", `${p.name} — ${UI.naira(p.amount)} confirmed by Zainpay.`, "success"); refresh(); charts();
-        });
-        UI.$("#pRefund", d.el)?.addEventListener("click", async () => {
-            if (!(await UI.confirm({ title: "Refund this payment?", message: `${UI.naira(p.amount)} will be returned to ${UI.esc(p.name)} via Zainpay.`, confirmText: "Issue refund", tone: "danger", icon: "fa-rotate-left" }))) return;
-            DB.update("payments", ref, { status: "REFUNDED", refundedAt: new Date().toISOString() });
-            if (p.email) Notifications.push(p.email, "Refund processed", `A refund of ${UI.naira(p.amount)} (${p.ref}) has been processed.`, "payment");
-            d.close(); UI.toast("Refund issued", `${UI.naira(p.amount)} refunded (simulated).`, "success"); refresh(); charts();
-        });
-        UI.$("#pRemind", d.el)?.addEventListener("click", () => { if (p.email) Notifications.push(p.email, "Complete your payment", `Your payment for ${Programmes.name(p.programmeId)} did not go through. Please try again.`, "payment"); d.close(); UI.toast("Reminder sent", `Email + SMS reminder sent to ${p.name} (simulated).`, "success"); });
-        UI.$("#pReceipt", d.el)?.addEventListener("click", () => Payments.showReceipt(ref));
-    }
-    ["#tSearch", "#tStatus", "#tChannel", "#tProg"].forEach((s) => UI.$(s).addEventListener(s === "#tSearch" ? "input" : "change", UI.debounce(refresh, 120)));
-    UI.$("#expPay").onclick = () => UI.downloadCSV("tsce-transactions.csv", Payments.all().map((p) => ({ Reference: p.ref, Student: p.name, Email: p.email, Application: p.applicationId, Programme: Programmes.name(p.programmeId), Amount: p.amount, Gateway: "Zainpay", Channel: Payments.CHANNEL[p.channel], Status: p.status, Date: UI.dateTime(p.createdAt) })));
-    refresh(); charts();
-    const open = UI.param("ref"); if (open && DB.get("payments", open)) detail(open);
-};
+/* Staff payments: see js/staff.js (API-backed, Phase 5). */
 
 /* ---------------- Student: Payments ---------------- */
 Pages["student-payments"] = function (view, ctx) {
