@@ -199,7 +199,8 @@ Permissions: `IsApplicant`, `IsStudent`, `IsStaff` (staff+admin), `IsAdmin`. Stu
 - [x] systemd timers: `reconcile_payments` every 5 minutes; nightly SQLite (`.backup` + integrity check) + private-uploads backup, 30 days kept
 - [x] `manage.py preflight [--send-test-email]`: go-live checklist (secrets, HTTPS/hosts/CSRF, migrations, school data, admin, Zainpay keys + webhook URL, email, private-file safety, static files)
 - [x] `manage.py` picks production settings from `backend/.env` on the server
-- [ ] **Run on the VPS** — needs: server access, domain + DNS, Zainpay sandbox keys, Gmail app password
+- [x] **Deployed 1 Oct 2026** to the shared VPS (69.10.44.126) at **https://tsce.com.ng** (+ www), behind Cloudflare; Let's Encrypt certificate; all other sites on the server verified unaffected; timers and backup verified
+- [ ] Owner to finish on the server: Zainpay keys + Gmail app password in `/srv/tsce/backend/.env`, `systemctl restart tsce-gunicorn`, `tsce-manage createsuperuser`, `tsce-manage preflight --send-test-email …`; Zainpay webhook URL; Cloudflare SSL mode "Full (strict)"
 - [ ] Zainpay sandbox end-to-end test (guide §4) → clear test data → live keys
 - [ ] Off-server copy of `/var/backups/tsce` (provider snapshots, rclone, or scp)
 
