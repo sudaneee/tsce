@@ -1,4 +1,29 @@
-# TSCE Digital Platform — MVP
+# TSCE Digital Platform
+
+> **Backend in progress.** The approved frontend now lives in `frontend/`. A Django + SQLite backend in `backend/` is replacing the localStorage demo layer one phase at a time. See [PLAN.md](PLAN.md). Until a page is wired to the API, it still uses the demo data described below.
+
+## Development setup (Django)
+
+Requires Python 3.12+. From the repo root:
+
+```bash
+python -m venv backend/.venv
+backend/.venv/Scripts/pip install -r backend/requirements.txt   # Linux/macOS: backend/.venv/bin/pip
+cd backend
+.venv/Scripts/python manage.py migrate
+.venv/Scripts/python manage.py createsuperuser                  # admin role, Django admin access
+.venv/Scripts/python manage.py runserver
+# Site:  http://localhost:8000      API: http://localhost:8000/api/health      Admin: http://localhost:8000/admin/
+.venv/Scripts/python manage.py test apps                        # run the test suite
+```
+
+- In development, Django serves `frontend/` too, so there's one server and one origin. In production, nginx serves `frontend/` and proxies `/api/` and `/admin/` to gunicorn.
+- Configuration comes from `backend/.env`. Copy `backend/.env.example` to create it. Dev works without a `.env`; production requires one.
+- The frontend talks to the backend only through `frontend/js/api.js`, which handles the CSRF token, JSON or multipart bodies, and the error shape `{ error, code, fields }`.
+
+---
+
+## The original demo
 
 Frontend MVP for **Trust Skills Center of Excellence (TSCE), Zaria**. It includes a public website, an online application wizard, a simulated Zainpay checkout, a student portal and a staff/admin portal. Everything is built with HTML, CSS and vanilla JavaScript. A simulated backend runs in the browser on `localStorage`.
 

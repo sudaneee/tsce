@@ -1,0 +1,571 @@
+{
+  "source": "TSCE flyer (frontend/js/data.js: TSCE_FLYER, PROGRAMME_CATALOGUE)",
+  "flyer": {
+    "name": "Trust Skills Center of Excellence",
+    "short": "TSCE",
+    "campaign": "Skills Acquisition Training Program 2026",
+    "headline": "Launch Your Tech Career This October!",
+    "startDate": "2026-10-12",
+    "enrolmentOpens": "2026-10-01",
+    "enrolmentCloses": "2026-10-12",
+    "earlyBirdDeadline": "2026-10-01",
+    "discounts": {
+      "earlybird": 15,
+      "excellence": 50,
+      "scholarshipMax": 40
+    },
+    "phones": [
+      "0803 452 2501",
+      "0904 439 2228",
+      "0803 386 0784"
+    ],
+    "website": "www.tsce.edu.ng",
+    "email": "info@tsce.edu.ng",
+    "address": "KM8, Zaria – Sokoto Road, Zango – Shamu Zaria, P.O. Box 984 Zaria, Nigeria",
+    "city": "Zaria, Kaduna State, Nigeria",
+    "category": "Core Technical & Digital",
+    "motto": [
+      "Empowering People",
+      "Building Skills",
+      "Driving Sustainable Development"
+    ]
+  },
+  "programmes": [
+    {
+      "id": "cad",
+      "code": "TSCE-CAD",
+      "name": "CAD for Architecture & Engineering",
+      "weeks": 8,
+      "fee": 50000,
+      "track": "Design",
+      "icon": "fa-compass-drafting",
+      "color": "#1846D6",
+      "colorBg": "#EEF3FF",
+      "capacity": 30,
+      "overview": "Master computer-aided design for architectural and engineering drawings — from 2D drafting to 3D modelling and professional plotting — using industry-standard tools.",
+      "outcomes": [
+        "Produce accurate 2D architectural and engineering drawings",
+        "Build and render 3D models of buildings and components",
+        "Apply layers, blocks, annotation and dimensioning standards",
+        "Prepare professional plot sheets and drawing sets"
+      ],
+      "modules": [
+        "CAD Fundamentals & Interface",
+        "2D Drafting & Precision Tools",
+        "Layers, Blocks & Annotation",
+        "Architectural Floor Plans",
+        "Engineering & Mechanical Drawings",
+        "3D Modelling",
+        "Rendering & Visualisation",
+        "Plotting & Final Project"
+      ],
+      "audience": [
+        "Architecture and engineering students",
+        "Draughtsmen and technicians",
+        "Graduates seeking design roles"
+      ],
+      "careers": [
+        "CAD Technician",
+        "Architectural Draughtsman",
+        "Design Assistant",
+        "BIM Support Officer"
+      ],
+      "requirements": [
+        "Basic computer literacy",
+        "Interest in drawing and design",
+        "Laptop recommended (lab access provided)"
+      ],
+      "category": "Core Technical & Digital",
+      "schedules": [
+        "Weekday Morning (9:00am – 12:00pm)",
+        "Weekday Afternoon (1:00pm – 4:00pm)",
+        "Weekend (Sat & Sun, 10:00am – 3:00pm)"
+      ]
+    },
+    {
+      "id": "cyber-fund",
+      "code": "TSCE-CSF",
+      "name": "Cybersecurity Fundamentals",
+      "weeks": 6,
+      "fee": 45000,
+      "track": "Security",
+      "icon": "fa-shield-halved",
+      "color": "#DC2F45",
+      "colorBg": "#FDEEF0",
+      "capacity": 35,
+      "overview": "Build a strong foundation in how systems are attacked and defended. Learn security principles, threats, network security basics and safe digital practices.",
+      "outcomes": [
+        "Explain the CIA triad and core security principles",
+        "Identify common threats, malware and social engineering",
+        "Apply basic network and endpoint security controls",
+        "Practise safe password, email and data handling"
+      ],
+      "modules": [
+        "Introduction to Cybersecurity",
+        "Threats, Vulnerabilities & Attacks",
+        "Network Security Basics",
+        "Cryptography Essentials",
+        "Endpoint & Identity Security",
+        "Security Awareness & Final Assessment"
+      ],
+      "audience": [
+        "Beginners interested in cybersecurity",
+        "IT support staff",
+        "Business owners protecting their data"
+      ],
+      "careers": [
+        "Security Support Analyst",
+        "IT Security Assistant",
+        "SOC Trainee"
+      ],
+      "requirements": [
+        "Basic computer literacy",
+        "No prior security experience required"
+      ],
+      "category": "Core Technical & Digital",
+      "schedules": [
+        "Weekday Morning (9:00am – 12:00pm)",
+        "Weekday Afternoon (1:00pm – 4:00pm)",
+        "Weekend (Sat & Sun, 10:00am – 3:00pm)"
+      ]
+    },
+    {
+      "id": "cyber-ops",
+      "code": "TSCE-CSO",
+      "name": "Cybersecurity Operations Certificate",
+      "weeks": 8,
+      "fee": 50000,
+      "track": "Security",
+      "icon": "fa-user-shield",
+      "color": "#B4234A",
+      "colorBg": "#FCEEF2",
+      "capacity": 30,
+      "overview": "Hands-on security operations: monitor, detect, analyse and respond to incidents the way a Security Operations Centre (SOC) analyst does.",
+      "outcomes": [
+        "Monitor network traffic and system logs",
+        "Detect and triage security alerts",
+        "Follow an incident response process",
+        "Use common SOC tools and write incident reports"
+      ],
+      "modules": [
+        "SOC Roles & Operations",
+        "Network Protocols & Traffic Analysis",
+        "Windows & Linux Security",
+        "Log Analysis & SIEM",
+        "Threat Intelligence",
+        "Intrusion Detection",
+        "Incident Response",
+        "Capstone: SOC Simulation"
+      ],
+      "audience": [
+        "Graduates of Cybersecurity Fundamentals",
+        "IT professionals moving into security",
+        "Network administrators"
+      ],
+      "careers": [
+        "SOC Analyst (Tier 1)",
+        "Incident Response Assistant",
+        "Security Monitoring Officer"
+      ],
+      "requirements": [
+        "Basic networking knowledge",
+        "Cybersecurity Fundamentals or equivalent (recommended)"
+      ],
+      "category": "Core Technical & Digital",
+      "schedules": [
+        "Weekday Morning (9:00am – 12:00pm)",
+        "Weekday Afternoon (1:00pm – 4:00pm)",
+        "Weekend (Sat & Sun, 10:00am – 3:00pm)"
+      ]
+    },
+    {
+      "id": "data-ai",
+      "code": "TSCE-DSA",
+      "name": "Data Science & AI Literacy",
+      "weeks": 8,
+      "fee": 45000,
+      "track": "Data & AI",
+      "icon": "fa-brain",
+      "color": "#7C3AED",
+      "colorBg": "#F3EEFE",
+      "capacity": 35,
+      "overview": "Understand data and artificial intelligence practically — collect, clean, analyse and visualise data, and use AI tools responsibly for work and innovation.",
+      "outcomes": [
+        "Clean, analyse and visualise real datasets",
+        "Use spreadsheets and Python for data analysis",
+        "Understand how machine learning models work",
+        "Use generative AI tools productively and responsibly"
+      ],
+      "modules": [
+        "Data Literacy Foundations",
+        "Spreadsheets for Analysis",
+        "Python for Data",
+        "Data Cleaning & Wrangling",
+        "Data Visualisation",
+        "Intro to Machine Learning",
+        "Generative AI & Prompting",
+        "Capstone: Data Story"
+      ],
+      "audience": [
+        "Students and graduates of any discipline",
+        "Professionals who work with reports and data",
+        "Aspiring data analysts"
+      ],
+      "careers": [
+        "Data Analyst (Junior)",
+        "Business Intelligence Assistant",
+        "AI-enabled Operations Officer"
+      ],
+      "requirements": [
+        "Basic computer literacy",
+        "Comfort with basic mathematics"
+      ],
+      "category": "Core Technical & Digital",
+      "schedules": [
+        "Weekday Morning (9:00am – 12:00pm)",
+        "Weekday Afternoon (1:00pm – 4:00pm)",
+        "Weekend (Sat & Sun, 10:00am – 3:00pm)"
+      ]
+    },
+    {
+      "id": "fullstack",
+      "code": "TSCE-FSE",
+      "name": "Full-Stack Software Engineering",
+      "weeks": 10,
+      "fee": 50000,
+      "track": "Software",
+      "icon": "fa-code",
+      "color": "#0EA5E9",
+      "colorBg": "#E7F6FE",
+      "capacity": 40,
+      "overview": "Go from zero to deploying complete web applications. Learn frontend and backend development, databases, APIs and deployment through real projects.",
+      "outcomes": [
+        "Build responsive websites with HTML, CSS and JavaScript",
+        "Develop frontends and REST APIs",
+        "Design and query databases",
+        "Implement authentication and deploy to the cloud",
+        "Ship a portfolio-ready capstone project"
+      ],
+      "modules": [
+        "Web Development Fundamentals",
+        "HTML & CSS",
+        "JavaScript",
+        "Git & GitHub",
+        "Frontend Development",
+        "Backend Development",
+        "APIs",
+        "Databases",
+        "Authentication",
+        "Deployment",
+        "Final Capstone Project"
+      ],
+      "audience": [
+        "Aspiring software developers",
+        "Computer science students and graduates",
+        "Career switchers into tech"
+      ],
+      "careers": [
+        "Frontend Developer",
+        "Backend Developer",
+        "Full-Stack Developer",
+        "Freelance Web Developer"
+      ],
+      "requirements": [
+        "Basic computer literacy",
+        "Laptop strongly recommended",
+        "Commitment to weekly practice"
+      ],
+      "category": "Core Technical & Digital",
+      "schedules": [
+        "Weekday Morning (9:00am – 12:00pm)",
+        "Weekday Afternoon (1:00pm – 4:00pm)",
+        "Weekend (Sat & Sun, 10:00am – 3:00pm)"
+      ]
+    },
+    {
+      "id": "digital-marketing",
+      "code": "TSCE-DME",
+      "name": "Digital Marketing & E-Commerce",
+      "weeks": 6,
+      "fee": 50000,
+      "track": "Business",
+      "icon": "fa-bullhorn",
+      "color": "#F59E0B",
+      "colorBg": "#FFF6E3",
+      "capacity": 35,
+      "overview": "Grow brands and sell online. Learn social media marketing, content, paid ads, SEO, analytics and how to set up and run an online store.",
+      "outcomes": [
+        "Plan and run social media campaigns",
+        "Create engaging content for digital channels",
+        "Run paid ads and measure ROI",
+        "Set up and manage an e-commerce store"
+      ],
+      "modules": [
+        "Digital Marketing Foundations",
+        "Social Media Marketing",
+        "Content & Copywriting",
+        "SEO & Search Marketing",
+        "Paid Ads & Analytics",
+        "E-Commerce Store Setup"
+      ],
+      "audience": [
+        "Entrepreneurs and small business owners",
+        "Marketing and sales professionals",
+        "Content creators"
+      ],
+      "careers": [
+        "Digital Marketer",
+        "Social Media Manager",
+        "E-Commerce Manager",
+        "Content Strategist"
+      ],
+      "requirements": [
+        "Basic computer and smartphone skills"
+      ],
+      "category": "Core Technical & Digital",
+      "schedules": [
+        "Weekday Morning (9:00am – 12:00pm)",
+        "Weekday Afternoon (1:00pm – 4:00pm)",
+        "Weekend (Sat & Sun, 10:00am – 3:00pm)"
+      ]
+    },
+    {
+      "id": "hardware",
+      "code": "TSCE-CHE",
+      "name": "Computer Hardware Engineering",
+      "weeks": 8,
+      "fee": 50000,
+      "track": "Hardware",
+      "icon": "fa-microchip",
+      "color": "#12A150",
+      "colorBg": "#E9F8EF",
+      "capacity": 25,
+      "overview": "Understand computers inside-out: components, assembly, diagnostics, repair, maintenance and upgrades of desktops and laptops.",
+      "outcomes": [
+        "Identify and install computer components",
+        "Assemble, configure and upgrade PCs",
+        "Diagnose and repair hardware faults",
+        "Perform preventive maintenance safely"
+      ],
+      "modules": [
+        "Computer Architecture",
+        "Components & Peripherals",
+        "PC Assembly",
+        "BIOS/UEFI & OS Installation",
+        "Diagnostics & Troubleshooting",
+        "Laptop Repair",
+        "Power & Safety",
+        "Practical Repair Project"
+      ],
+      "audience": [
+        "Aspiring hardware technicians",
+        "IT support staff",
+        "Entrepreneurs in computer repair"
+      ],
+      "careers": [
+        "Hardware Technician",
+        "IT Support Engineer",
+        "Computer Repair Entrepreneur"
+      ],
+      "requirements": [
+        "Basic computer literacy",
+        "Interest in hands-on technical work"
+      ],
+      "category": "Core Technical & Digital",
+      "schedules": [
+        "Weekday Morning (9:00am – 12:00pm)",
+        "Weekday Afternoon (1:00pm – 4:00pm)",
+        "Weekend (Sat & Sun, 10:00am – 3:00pm)"
+      ]
+    },
+    {
+      "id": "network",
+      "code": "TSCE-NET",
+      "name": "Network Engineering",
+      "weeks": 8,
+      "fee": 50000,
+      "track": "Networking",
+      "icon": "fa-network-wired",
+      "color": "#0B84D8",
+      "colorBg": "#E6F4FD",
+      "capacity": 30,
+      "overview": "Design, build and troubleshoot computer networks — from cabling and IP addressing to routing, switching, wireless and network security.",
+      "outcomes": [
+        "Design LAN/WAN networks and IP addressing schemes",
+        "Configure routers and switches",
+        "Set up secure wireless networks",
+        "Troubleshoot network connectivity"
+      ],
+      "modules": [
+        "Networking Fundamentals",
+        "Cabling & Physical Layer",
+        "IP Addressing & Subnetting",
+        "Switching & VLANs",
+        "Routing Protocols",
+        "Wireless Networking",
+        "Network Security",
+        "Network Design Project"
+      ],
+      "audience": [
+        "IT students and graduates",
+        "IT support staff",
+        "Aspiring network engineers"
+      ],
+      "careers": [
+        "Network Technician",
+        "Network Administrator",
+        "NOC Engineer"
+      ],
+      "requirements": [
+        "Basic computer literacy"
+      ],
+      "category": "Core Technical & Digital",
+      "schedules": [
+        "Weekday Morning (9:00am – 12:00pm)",
+        "Weekday Afternoon (1:00pm – 4:00pm)",
+        "Weekend (Sat & Sun, 10:00am – 3:00pm)"
+      ]
+    },
+    {
+      "id": "it-essentials",
+      "code": "TSCE-ITE",
+      "name": "IT Essentials: Computer Hardware Basics",
+      "weeks": 6,
+      "fee": 45000,
+      "track": "Hardware",
+      "icon": "fa-desktop",
+      "color": "#0891B2",
+      "colorBg": "#E6FBFE",
+      "capacity": 35,
+      "overview": "An entry-level programme covering computer basics, hardware, operating systems and everyday IT support skills — the perfect starting point in tech.",
+      "outcomes": [
+        "Understand computer hardware and software basics",
+        "Install and configure operating systems",
+        "Perform basic troubleshooting",
+        "Support users with everyday IT problems"
+      ],
+      "modules": [
+        "Introduction to Computers",
+        "Hardware Components",
+        "Operating Systems",
+        "Networking Basics",
+        "Troubleshooting Fundamentals",
+        "IT Support Practicals"
+      ],
+      "audience": [
+        "Complete beginners",
+        "Secondary school leavers",
+        "Office staff"
+      ],
+      "careers": [
+        "IT Support Assistant",
+        "Help Desk Officer",
+        "Computer Operator"
+      ],
+      "requirements": [
+        "No prior experience required"
+      ],
+      "category": "Core Technical & Digital",
+      "schedules": [
+        "Weekday Morning (9:00am – 12:00pm)",
+        "Weekday Afternoon (1:00pm – 4:00pm)",
+        "Weekend (Sat & Sun, 10:00am – 3:00pm)"
+      ]
+    },
+    {
+      "id": "cisco-cloud",
+      "code": "TSCE-CCT",
+      "name": "Cisco Cloud Technologies",
+      "weeks": 8,
+      "fee": 50000,
+      "track": "Cloud",
+      "icon": "fa-cloud",
+      "color": "#2563EB",
+      "colorBg": "#EAF1FE",
+      "capacity": 30,
+      "overview": "Learn how modern cloud infrastructure works — virtualisation, cloud service models, data-centre networking and cloud security using Cisco-aligned content.",
+      "outcomes": [
+        "Explain cloud service and deployment models",
+        "Understand virtualisation and data-centre networking",
+        "Apply cloud security fundamentals",
+        "Plan basic cloud migrations"
+      ],
+      "modules": [
+        "Cloud Computing Concepts",
+        "Virtualisation",
+        "Data Centre Networking",
+        "Cloud Storage",
+        "Cloud Security",
+        "Automation Basics",
+        "Hybrid & Multi-Cloud",
+        "Cloud Project"
+      ],
+      "audience": [
+        "Network and IT professionals",
+        "Graduates interested in cloud careers"
+      ],
+      "careers": [
+        "Cloud Support Associate",
+        "Cloud Network Technician",
+        "Infrastructure Engineer (Junior)"
+      ],
+      "requirements": [
+        "Basic networking knowledge recommended"
+      ],
+      "category": "Core Technical & Digital",
+      "schedules": [
+        "Weekday Morning (9:00am – 12:00pm)",
+        "Weekday Afternoon (1:00pm – 4:00pm)",
+        "Weekend (Sat & Sun, 10:00am – 3:00pm)"
+      ]
+    },
+    {
+      "id": "aws-db",
+      "code": "TSCE-AWS",
+      "name": "AWS Database Management",
+      "weeks": 8,
+      "fee": 50000,
+      "track": "Cloud",
+      "icon": "fa-database",
+      "color": "#F97316",
+      "colorBg": "#FFF1E7",
+      "capacity": 30,
+      "overview": "Design, deploy and manage databases on Amazon Web Services — relational and NoSQL — including backups, security, performance and scaling.",
+      "outcomes": [
+        "Design relational database schemas and write SQL",
+        "Deploy and manage databases on AWS",
+        "Configure backups, security and monitoring",
+        "Choose between relational and NoSQL solutions"
+      ],
+      "modules": [
+        "Database Fundamentals",
+        "SQL Essentials",
+        "AWS Cloud Basics",
+        "Amazon RDS",
+        "Amazon DynamoDB",
+        "Security & IAM",
+        "Backup, Monitoring & Performance",
+        "Database Project"
+      ],
+      "audience": [
+        "Developers and IT professionals",
+        "Data and cloud enthusiasts"
+      ],
+      "careers": [
+        "Database Administrator (Junior)",
+        "Cloud Database Associate",
+        "Data Engineer (Trainee)"
+      ],
+      "requirements": [
+        "Basic computer literacy",
+        "Some exposure to data or programming helpful"
+      ],
+      "category": "Core Technical & Digital",
+      "schedules": [
+        "Weekday Morning (9:00am – 12:00pm)",
+        "Weekday Afternoon (1:00pm – 4:00pm)",
+        "Weekend (Sat & Sun, 10:00am – 3:00pm)"
+      ]
+    }
+  ]
+}

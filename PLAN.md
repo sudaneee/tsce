@@ -50,30 +50,33 @@ tsce-platform/
 └── README.md
 ```
 
-## Data model (key fields)
+## Data model (as built in Phase 1)
 
-- **User**: email (unique, login), password (hashed), full name, role, is_active.
-- **StaffProfile**: user, staff_no (`STF-001`), title, department, phone, status. Instructors are staff records **without** a login; programmes reference them.
-- **Programme**: slug (`fullstack`), code (`TSCE-FSE`), name, weeks, fee, track, icon, colours, capacity, instructor (FK StaffProfile, nullable), overview, outcomes/audience/careers/requirements (JSON lists), schedules (JSON), is_active. *Seats taken are computed from enrolments, not stored.*
-- **Module**: programme, order, title.
-- **Cohort**: name ("October 2026 Cohort"), start_date, is_current.
-- **Application**: number (`TSCE/APP/2026/00001`), applicant (User), personal fields, education fields, waec_status/year/num_as, waec_file (upload), programme, cohort, schedule, fee, discount_type, discount_pct, discount_amount, amount_payable, status (`Pending → Under Review → Accepted → Enrolled` / `Rejected`), payment_status (`Unpaid/Pending/Paid/Failed/Refunded`), timestamps.
-  *The demo mixes "Paid" into `status`. It becomes payment_status only, and the UI badges are mapped accordingly.*
-- **ApplicationEvent**: application, at, text, ok, actor. This is the history timeline.
-- **AwardRequest**: application, type (`excellence`/`scholarship`), requested_pct, awarded_pct, interview_score, evidence, status, reviewed_by, reviewed_at, note.
-- **Payment**: reference (`TSCE-ZP-YYYYMMDD-000001`), kind (`charge`/`refund`), application, enrollment, payer email/name, amount, fee, discount, channel, status (`PENDING/SUCCESS/FAILED/REFUNDED`), gateway_ref, gateway_payload (JSON), failure_reason, verified_at, refunded_at, parent (refund → charge).
-- **WebhookEvent**: raw body, headers, signature_valid, processed, created_at. Used for auditing.
-- **Enrollment** (the "student"): student_no (`TSCE/2026/00001`), user, application, programme, cohort, schedule, start/end dates, status (`Admission Pending/Active/Completed/Withdrawn`), amount_paid, emergency_contact.
-- **ModuleProgress**: enrollment, module, pct.
-- **AttendanceSession**: programme, cohort, date, module. **AttendanceRecord**: session, enrollment, status (`Present/Late/Absent`).
-- **Result**: enrollment, module, type, score, grade (derived), remark, status (`Draft/Published`), date.
-- **Certificate**: number (`TSCE/CERT/2026/00001`), enrollment, status (`Not Issued/Issued/Revoked`), issued_at, revoked_at.
-- **Notification**: recipient (User) *or* audience=`staff`, title, body, type, read.
-- **Announcement**: title, body, audience (`Public/Students/Staff`), tag, pinned, status (`Draft/Published`), author.
-- **SupportTicket**: enrollment, subject, category, message, status, reply.
-- **Enquiry**: contact-form submissions.
-- **SiteSettings** (singleton): institution info, admissions dates (opens, closes, cohort date, early-bird deadline), accepting_applications, payment options, notification toggles.
-- **Sequence**: named counters (`app`, `tx`, `student`, `cert`) incremented with `select_for_update`, so concurrent requests can't produce duplicate numbers.
+All amounts are whole naira. Display numbers (`TSCE/APP/2026/00001` and so on) come from `core.Sequence` inside a write transaction. Primary keys are ordinary auto IDs.
+
+| App | Model | Notes |
+|---|---|---|
+| core | **SiteSettings** | Singleton (pk=1). Institution info, certificate signatory, `current_cohort`, `accepting_applications`, discount % and Excellence criteria, payment ref prefix and channels, notification toggles. Gateway keys stay in `.env`. |
+| core | **Sequence** | Named counters (`app`, `tx`, `student`, `cert`, `ticket`). |
+| accounts | **User** | Email login (stored lower-case, case-insensitive), `full_name`, `role` (`applicant/student/staff/admin`). `is_staff` means Django admin access only. |
+| accounts | **StaffProfile** | `staff_no`, title, department, status. `user` is optional: **instructors have no login**. |
+| programmes | **Programme** | `slug` is the public id (`fullstack`), plus code, fee, weeks, capacity, nullable `instructor`, status, presentation fields, JSON lists (outcomes, audience, careers, requirements, schedules). Seats taken are computed from enrolments. |
+| programmes | **Module** | Ordered per programme. Re-seeding renames in place, so results stay attached. |
+| programmes | **Cohort** | Owns the admissions calendar: `start_date`, `enrolment_opens/closes`, `early_bird_deadline`. |
+| admissions | **Application** | A snapshot of the applicant's submission, the WAEC file in **private storage**, programme, cohort, schedule, fee and discount fields, `status` (`Pending/Under Review/Accepted/Enrolled/Rejected`) and a separate `payment_status` (`Unpaid/Pending/Paid/Failed/Refunded`). The demo's "Paid" status maps to `payment_status`. |
+| admissions | **ApplicationEvent** | The timeline (text, ok, actor). |
+| admissions | **AwardRequest** | One per application. Excellence or scholarship; requested/awarded %, interview score, evidence, review fields. |
+| payments | **Payment** | `kind` is charge or refund. A refund **must** have a `parent` charge (DB constraint). Also stores status, channel, gateway, `gateway_ref`, `checkout_url`, `gateway_payload`, and verification and refund timestamps. Read-only in admin. |
+| payments | **WebhookEvent** | Every webhook is stored raw before processing, with signature validity and processed/error fields. |
+| academics | **Student** | The person, one per user. `student_no` and contact details (editable by the student) are copied from the application when payment is confirmed. |
+| academics | **Enrollment** | Student × programme × cohort (unique). Schedule, dates, status, a single `progress` %, and `amount_paid`. **Per-module progress is derived** from `progress`, so there's no per-module table to maintain. |
+| academics | **AttendanceSession / AttendanceRecord** | One session per programme, cohort and day. One mark per enrolment per session. |
+| academics | **Result** | One per enrolment and module. The grade is computed on save. Draft or Published. |
+| academics | **Certificate** | Created **when issued** (no reserved numbers). Issued or Revoked. |
+| comms | **Notification** | Per user. Staff-wide alerts are fanned out to each staff user so each has their own read state. |
+| comms | **Announcement / SupportTicket / Enquiry** | As in the demo, plus author and reply tracking. |
+
+**Private files:** WAEC uploads are saved under `PRIVATE_MEDIA_ROOT`, which nginx never serves. Staff download them through a permission-checked API view.
 
 ## Core business rules (move from JS to `services.py`)
 
@@ -102,14 +105,17 @@ Permissions: `IsApplicant`, `IsStudent`, `IsStaff` (staff+admin), `IsAdmin`. Stu
 ### MVP — live for the October cohort
 
 **Phase 0 — Setup**
-- [ ] `git init`, `.gitignore`, move frontend into `frontend/`
-- [ ] Django project `backend/` (settings split dev/prod, `.env` via `django-environ`), DRF, SQLite WAL
-- [ ] Django serves `frontend/` in dev; `js/api.js` fetch wrapper with CSRF + error handling
+- [x] `git init`, `.gitignore`, move frontend into `frontend/`
+- [x] Django project `backend/` (settings split dev/prod, `.env` via `django-environ`), DRF, SQLite WAL
+- [x] Django serves `frontend/` in dev; `js/api.js` fetch wrapper with CSRF + error handling
+- [x] Custom `User` model (email login, role) — must exist before the first migration
+- [x] Uniform API error shape, `/api/health`, `/api/auth/csrf`, foundation tests
 
 **Phase 1 — Data layer**
-- [ ] All models + migrations + Django admin registrations
-- [ ] `seed_school` command: SiteSettings from flyer + 11 programmes/modules + October cohort
-- [ ] `seed_demo` command (staging only) porting `SeedData`
+- [x] All models + migrations + Django admin registrations (20 models)
+- [x] `seed_school` command: SiteSettings from flyer + 11 programmes / 85 modules + October cohort (idempotent; `--update` resets programmes to the flyer)
+- [x] Model tests: sequences, singleton, grading, derived module progress, constraints, seed behaviour
+- [ ] ~~`seed_demo`~~ moved to Phase 5b, so demo data is created through the real services instead of duplicating their logic
 
 **Phase 2 — Auth**
 - [ ] Login/logout/me, role guards, `createsuperuser` → admin role
@@ -132,6 +138,9 @@ Permissions: `IsApplicant`, `IsStudent`, `IsStaff` (staff+admin), `IsAdmin`. Stu
 - [ ] Award (Excellence/Scholarship) review with refund calculation
 - [ ] Payments list, verify pending transfer, refund, reminders
 - [ ] Staff accounts management + admin password reset; Settings page (admissions dates, early-bird deadline, accepting applications)
+
+**Phase 5b — Demo/staging data**
+- [ ] `seed_demo` command (staging only): builds demo applicants, payments and students by calling the real services
 
 **Phase 6 — Deploy (VPS)**
 - [ ] nginx + gunicorn + systemd, HTTPS (Let's Encrypt), `collectstatic`, media dir permissions
