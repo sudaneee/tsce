@@ -38,16 +38,14 @@ def _checkout_terms(app: Application, purpose: str, settings: SiteSettings) -> d
     if app.status == Application.Status.REJECTED:
         raise ServiceError("This application was not successful, so it can't be paid.", "application_rejected")
     if purpose == Payment.Purpose.APPLICATION_FEE:
-        if app.application_fee_paid_at:
-            raise ServiceError("The application fee has already been paid.", "already_paid")
-        return {"amount": app.application_fee, "fee": app.application_fee, "discount": 0,
-                "description": f"Application fee — {app.programme.name} ({app.cohort.name})"}
+        # Since 4 Oct 2026 the application fee is part of the programme-fee payment.
+        raise ServiceError("The application fee is now included in the programme fee — there's nothing separate to pay.",
+                           "application_fee_included")
 
     if app.payment_status == Application.PaymentStatus.PAID:
         raise ServiceError("The programme fee has already been paid.", "already_paid")
     if app.status != Application.Status.ADMITTED:
         msg = {
-            Application.Status.PENDING: "Pay the application fee first.",
             Application.Status.AWAITING_VERIFICATION: "The Excellence Award must be verified at TSCE before the programme fee can be paid.",
         }.get(app.status, "This application can't take a programme-fee payment.")
         raise ServiceError(msg, "not_admitted")
@@ -55,8 +53,10 @@ def _checkout_terms(app: Application, purpose: str, settings: SiteSettings) -> d
     if seats_taken(app.cohort).get(app.programme_id, 0) >= app.programme.capacity:
         raise ServiceError(f"Sorry — {app.programme.name} is now full for the {app.cohort.name}. "
                            "Contact admissions to change programme.", "programme_full")
+    included = app.amount_payable - (app.fee - app.discount_amount)
     return {"amount": app.amount_payable, "fee": app.fee, "discount": app.discount_amount,
-            "description": f"{app.programme.name} — programme fee ({app.cohort.name})"}
+            "description": f"{app.programme.name} — programme fee ({app.cohort.name})"
+                           + (f" incl. ₦{included:,} application fee" if included > 0 else "")}
 
 
 def start_checkout(app: Application, purpose: str, callback_url: str) -> Payment:

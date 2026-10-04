@@ -1,4 +1,4 @@
-# Fills a fresh e2e database (see e2e/run.sh): two verified self-applicants with new (unpaid) applications.
+# Fills a fresh e2e database (see e2e/run.sh): two verified self-applicants admitted on applying, nothing paid yet.
 from datetime import date
 
 from django.core.management import call_command
@@ -21,6 +21,7 @@ for n, (first, last, email, slug) in enumerate([("Aisha", "Garba", "aisha@exampl
         number=f"TSCE/APP/2026/{n:05d}", user=user, first_name=first, last_name=last, gender="Female",
         dob=date(2002, 5, 14), phone="0803 123 4567", email=email, address="Samaru, Zaria", state="Kaduna", lga="Zaria",
         qualification="OND", institution="NBP", grad_year=2023, waec_status="Not Applicable", programme=prog,
-        cohort=cohort, schedule=prog.schedules[0], application_fee=5000, fee=prog.fee, amount_payable=prog.fee)
+        cohort=cohort, schedule=prog.schedules[0], application_fee=5000, fee=prog.fee, amount_payable=prog.fee + 5000,
+        status="Admitted")
     ApplicationEvent.objects.create(application=app, text="Application submitted online")
 print("e2e setup done")

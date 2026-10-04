@@ -1,4 +1,4 @@
-"""Browser test of payment states: application fee → (simulated) Zainpay → admitted → programme fee → receipt."""
+"""Browser test of payment states: admitted → one payment (programme fee incl. application fee) via (simulated) Zainpay → receipt."""
 import os
 import sys
 from urllib.parse import quote
@@ -37,30 +37,25 @@ with sync_playwright() as p:
     login(page, "aisha@example.com")
     page.wait_for_url("**/pages/my-applications.html"); page.wait_for_selector("#maRoot article")
     check("applicant login opens My applications", "TSCE/APP/2026/00001" in page.inner_text("#maRoot"))
-    page.click("text=Pay application fee"); page.wait_for_url("**purpose=application_fee*"); page.wait_for_selector("#payNow")
-    check("application fee ₦5,000 + ₦300", "5,300" in page.inner_text(".checkout-head") and "5,000" in page.inner_text(".order-summary"))
+    page.click("text=Pay programme fee"); page.wait_for_url("**purpose=programme_fee*"); page.wait_for_selector("#payNow")
+    summary = page.inner_text(".order-summary")
+    check("one invoice: ₦50,000 + ₦5,000 application fee + ₦300", "5,000" in summary and "50,000" in summary and "55,300" in page.inner_text(".checkout-head"), summary)
     check("simulator clearly labelled", "simulated payments" in page.inner_text(".sandbox-box").lower())
     check("bank transfer only", "Bank transfer" in page.inner_text(".checkout") and "Visa" not in page.inner_text(".checkout"))
 
     page.click("#payNow"); page.wait_for_url("**/api/payments/simulator/*")
-    check("simulated checkout charges ₦5,300", "5,300" in page.inner_text(".amt"))
+    check("simulated checkout charges ₦55,300", "55,300" in page.inner_text(".amt"))
     page.click("button[value=failed]"); page.wait_for_url("**result=failed*"); page.wait_for_selector("#payNow")
     check("declined: back on the same invoice", "didn't go through" in page.inner_text("#payRoot") and "Application fee" in page.inner_text(".order-summary"))
 
-    page.click("#payNow"); page.wait_for_url("**/api/payments/simulator/*")
-    page.click("button[value=success]"); page.wait_for_url("**/pages/success.html?ref=*"); page.wait_for_selector(".success-card")
-    check("application fee paid → admitted", "ADMITTED" in page.inner_text(".success-card").upper())
-    page.click("text=Pay programme fee"); page.wait_for_url("**purpose=programme_fee*"); page.wait_for_selector("#payNow")
-    summary = page.inner_text(".order-summary")
-    check("programme fee invoice itemised", "50,000" in summary and "Zainpay transaction charge" in summary and "50,300" in summary)
     page.click("#payNow"); page.wait_for_url("**/api/payments/simulator/*")
     page.click("button[value=success]"); page.wait_for_url("**/pages/success.html?ref=*"); page.wait_for_selector(".success-card")
     body = page.inner_text(".success-card")
     check("enrolled with student number", "ENROLMENT CONFIRMED" in body.upper() and "TSCE/2026/00001" in body, body[:300])
     page.click("#dlReceipt"); page.wait_for_selector(".modal .receipt")
     receipt = page.inner_text(".modal .receipt")
-    check("receipt: fee, ref, sandbox note", "50,000" in receipt and "TSCE-ZP-" in receipt and "simulated payment" in receipt, receipt[:300])
-    check("receipt: charge explained, not in total", "transaction charge" in receipt and "50,300" not in receipt)
+    check("receipt itemises programme + application fee", "50,000" in receipt and "Application fee" in receipt and "55,000" in receipt and "TSCE-ZP-" in receipt and "simulated payment" in receipt, receipt[:400])
+    check("receipt: charge explained, not in total", "transaction charge" in receipt and "55,300" not in receipt)
     page.keyboard.press("Escape")
     me = page.evaluate("API.get('auth/me').then(r => r.user)")
     check("self-applicant becomes a student", me["role"] == "student" and me["studentId"] == "TSCE/2026/00001")
@@ -68,7 +63,7 @@ with sync_playwright() as p:
     page.goto(f"{B}/pages/payment.html?app={APP1}&purpose=programme_fee"); page.wait_for_selector("#payRoot .card")
     check("programme fee can't be paid twice", "already paid" in page.inner_text("#payRoot"))
     page.goto(f"{B}/pages/payment.html?app={APP1}&purpose=application_fee"); page.wait_for_selector("#payRoot .card")
-    check("application fee can't be paid twice", "already paid" in page.inner_text("#payRoot"))
+    check("old application-fee links land on the same paid state", "already paid" in page.inner_text("#payRoot"))
     page.goto(f"{B}/pages/my-applications.html"); page.wait_for_selector("#maRoot article")
     check("My applications shows enrolled", "Enrolled" in page.inner_text("#maRoot"))
     page.click("#maRoot >> text=Student portal"); page.wait_for_url("**/student/dashboard.html"); page.wait_for_selector("#view")
@@ -79,7 +74,7 @@ with sync_playwright() as p:
     # Applicant 2: abandons checkout → pending + checks; can't see applicant 1's things
     ctx = browser.new_context(); page = ctx.new_page(); watch(page)
     login(page, "musa@example.com")
-    page.wait_for_url("**/my-applications.html"); page.click("text=Pay application fee"); page.wait_for_selector("#payNow")
+    page.wait_for_url("**/my-applications.html"); page.click("text=Pay programme fee"); page.wait_for_selector("#payNow")
     page.click("#payNow"); page.wait_for_url("**/api/payments/simulator/*")
     page.click("button[value=cancel]"); page.wait_for_url("**result=pending*"); page.wait_for_selector("#pendingBox")
     check("abandoned: 'confirming' notice", "confirming your payment" in page.inner_text("#pendingBox"))

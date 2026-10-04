@@ -117,6 +117,14 @@ const Payments = (() => {
     const all = () => DB.all("payments");
     const forStudent = (s) => all().filter((p) => p.studentId === s.id || p.email === s.email || p.applicationId === s.appId);
 
+    /** Programme fee − discount + application fee (included since 4 Oct 2026) = amount. */
+    function receiptLines(p) {
+        if (!p.fee || p.fee === p.amount) return "";
+        const discount = p.discount || 0, appFee = p.amount - (p.fee - discount);
+        if (appFee < 0) return `<tr><td>Programme fee</td><td>${UI.naira(p.fee)}</td></tr><tr><td>Discount applied</td><td style="color:var(--success)">−${UI.naira(p.fee - p.amount)}</td></tr>`;
+        return `<tr><td>Programme fee</td><td>${UI.naira(p.fee)}</td></tr>${discount ? `<tr><td>Discount applied</td><td style="color:var(--success)">−${UI.naira(discount)}</td></tr>` : ""}${appFee ? `<tr><td>Application fee</td><td>${UI.naira(appFee)}</td></tr>` : ""}`;
+    }
+
     function receiptHTML(p) {
         const prog = Programmes.get(p.programmeId);
         const inst = Site.settings?.institution || {};
@@ -132,7 +140,7 @@ const Payments = (() => {
                 ${p.applicationId ? `<tr><td>Application No.</td><td class="mono">${UI.esc(p.applicationId)}</td></tr>` : ""}
                 ${p.studentId ? `<tr><td>Student ID</td><td class="mono">${UI.esc(p.studentId)}</td></tr>` : ""}
                 <tr><td>Description</td><td>${UI.esc(p.description || (prog ? prog.name : "Payment"))}</td></tr>
-                ${p.fee && p.fee !== p.amount ? `<tr><td>Programme fee</td><td>${UI.naira(p.fee)}</td></tr><tr><td>Discount applied</td><td style="color:var(--success)">−${UI.naira(p.discount || p.fee - p.amount)}</td></tr>` : ""}
+                ${receiptLines(p)}
                 <tr><td>Payment gateway</td><td>Zainpay${CHANNEL[p.channel] ? " · " + CHANNEL[p.channel] : ""}</td></tr>
                 <tr><td>Status</td><td>${p.status}</td></tr>
                 <tr class="r-total"><td>Amount paid</td><td>${UI.naira(p.amount)}</td></tr>
@@ -231,28 +239,21 @@ Pages["payment"] = async function () {
         wrap.innerHTML = card({ icon: "fa-circle-xmark", title: "This application was not successful", text: "It can no longer be paid. Contact the admissions office if you have questions.", action: mine });
         return;
     }
-    // Which fee: as asked, or the next one due.
-    const purpose = wanted || (app.applicationFeePaidAt ? "programme_fee" : "application_fee");
-    if (purpose === "application_fee" && app.applicationFeePaidAt) {
-        wrap.innerHTML = card({ icon: "fa-circle-check", title: "The application fee is already paid", text: `Paid on ${UI.date(app.applicationFeePaidAt)}. Follow the next step from My applications.`, action: mine });
+    // One payment since 4 Oct 2026: the programme fee, with the application fee included.
+    const purpose = "programme_fee";
+    if (app.paymentStatus === "Paid") {
+        wrap.innerHTML = card({ icon: "fa-circle-check", title: "The programme fee is already paid", text: `${UI.esc(app.name)} is enrolled.`, action: `<a class="btn btn-primary" href="success.html?ref=${encodeURIComponent(app.txRef || "")}&fresh=0">View confirmation</a>` });
         return;
     }
-    if (purpose === "programme_fee") {
-        if (app.paymentStatus === "Paid") {
-            wrap.innerHTML = card({ icon: "fa-circle-check", title: "The programme fee is already paid", text: `${UI.esc(app.name)} is enrolled.`, action: `<a class="btn btn-primary" href="success.html?ref=${encodeURIComponent(app.txRef || "")}&fresh=0">View confirmation</a>` });
-            return;
-        }
-        if (app.status === "Pending") {
-            wrap.innerHTML = card({ icon: "fa-file-invoice", title: "Pay the application fee first", text: "The programme fee is paid after admission.", action: `<a class="btn btn-primary" href="payment.html?app=${encodeURIComponent(app.id)}&purpose=application_fee">Pay application fee</a>` });
-            return;
-        }
-        if (app.status === "Awaiting Verification") {
-            wrap.innerHTML = card({ icon: "fa-id-card", title: "Excellence Award verification pending", text: `Bring the original WAEC/NECO result to TSCE (${UI.esc(Site.settings?.institution?.address || "")}). You can pay the programme fee once admissions has verified it.`, action: mine });
-            return;
-        }
+    if (app.status === "Awaiting Verification") {
+        wrap.innerHTML = card({ icon: "fa-id-card", title: "Excellence Award verification pending", text: `Bring the original WAEC/NECO result to TSCE (${UI.esc(Site.settings?.institution?.address || "")}). You can pay the programme fee once admissions has verified it.`, action: mine });
+        return;
     }
-    const isAppFee = purpose === "application_fee";
-    const due = isAppFee ? app.applicationFee : app.amountPayable;
+    if (app.status !== "Admitted") {
+        wrap.innerHTML = card({ icon: "fa-hourglass-half", title: "Not ready for payment yet", text: "This application is still being processed. Follow it from My applications.", action: mine });
+        return;
+    }
+    const due = app.amountPayable;
 
     const prog = Programmes.get(app.programmeId) || { name: app.programmeName, weeks: "", color: "#1846D6", icon: "fa-layer-group" };
     const env = pset.environment;
@@ -280,7 +281,7 @@ Pages["payment"] = async function () {
         </div>
         <aside class="order-summary">
             <div class="card card-pad">
-                <div class="flex between mb-2"><h3 class="mb-0" style="font-size:1.05rem">${isAppFee ? "Application fee" : "Programme fee"}</h3>${UI.badge(result === "failed" ? "Failed" : "Pending Payment")}</div>
+                <div class="flex between mb-2"><h3 class="mb-0" style="font-size:1.05rem">Programme fee</h3>${UI.badge(result === "failed" ? "Failed" : "Pending Payment")}</div>
                 <div class="flex mb-2" style="align-items:flex-start"><span class="icon-tile" style="background:${prog.color};color:#fff"><i class="fa-solid ${prog.icon}"></i></span><div><strong style="font-family:var(--font-head)">${UI.esc(app.programmeName)}</strong><div class="small muted">${prog.weeks ? prog.weeks + " weeks · " : ""}${UI.esc(app.intake)}</div></div></div>
                 <div class="bank-box" style="margin-bottom:14px">
                     <div class="row"><span class="muted">Applicant</span><strong>${UI.esc(app.name)}</strong></div>
@@ -288,14 +289,14 @@ Pages["payment"] = async function () {
                     <div class="row"><span class="muted">Schedule</span><strong style="font-size:.84rem;text-align:right">${UI.esc(app.schedule)}</strong></div>
                 </div>
                 <div class="fee-box">
-                    ${isAppFee ? `<div class="fee-row"><span>Application fee (non-refundable)</span><span>${UI.naira(app.applicationFee)}</span></div>` : `<div class="fee-row"><span>Programme Fee</span><span>${UI.naira(app.fee)}</span></div>
-                    ${app.discountAmount ? `<div class="fee-row"><span>${Applications.discountName(app.discountType)} (${app.discountPct}%)</span><span class="neg">−${UI.naira(app.discountAmount)}</span></div>` : ""}`}
+                    <div class="fee-row"><span>Programme Fee</span><span>${UI.naira(app.fee)}</span></div>
+                    ${app.discountAmount ? `<div class="fee-row"><span>${Applications.discountName(app.discountType)} (${app.discountPct}%)</span><span class="neg">−${UI.naira(app.discountAmount)}</span></div>` : ""}
+                    ${app.applicationFeeDue ? `<div class="fee-row"><span>Application fee (non-refundable)</span><span>${UI.naira(app.applicationFeeDue)}</span></div>` : app.applicationFeePaidAt ? `<div class="fee-row"><span>Application fee</span><span class="muted">already paid</span></div>` : ""}
                     <div class="fee-row total"><span>Amount Payable</span><span>${UI.naira(due)}</span></div>
                     ${charge ? `<div class="fee-row"><span>Zainpay transaction charge</span><span>${UI.naira(charge)}</span></div><div class="fee-row total"><span>Total to pay</span><span>${UI.naira(total)}</span></div>` : ""}
                 </div>
-                ${isAppFee && app.awardRequest?.status === "Pending" ? `<div class="alert mt-2"><i class="fa-solid fa-award"></i><p>After paying, bring the original WAEC/NECO result to TSCE to verify the <b>Excellence Award</b>. Admission is confirmed after verification.</p></div>` : ""}
                 <div class="flex mt-2 small muted"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Instant confirmation & e-receipt</div>
-                <div class="flex mt-1 small muted"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> ${isAppFee ? (app.awardRequest ? "Then: award verification at TSCE" : "Then: automatic admission") : "Enrolment confirmed after payment"}</div>
+                <div class="flex mt-1 small muted"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Enrolment confirmed after payment</div>
             </div>
         </aside></div>`;
 
@@ -384,7 +385,7 @@ Pages["success"] = async function () {
             <div><small>Application status</small>${UI.badge(app.status)}</div>
             <div><small>Transaction reference</small><strong class="mono" style="font-size:.82rem">${UI.esc(pay.ref)}</strong></div>
             <div><small>Amount paid</small><strong>${UI.naira(pay.amount)}</strong></div>
-            ${isAppFee ? "" : `<div><small>Discount</small><strong>${app.discountAmount ? `${Applications.discountName(app.discountType)} (−${UI.naira(app.discountAmount)})` : "None"}</strong></div>`}
+            ${isAppFee ? "" : `<div><small>Discount</small><strong>${pay.discount ? `${Applications.discountName(app.discountType)} (−${UI.naira(pay.discount)})` : "None"}</strong></div>`}
             <div><small>Classes begin</small><strong>${UI.dateLong(start)}</strong></div>
         </div>
         <div class="success-actions no-print">

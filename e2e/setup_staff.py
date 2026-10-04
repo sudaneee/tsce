@@ -31,7 +31,7 @@ def app(n, user, first, last, slug, status, **extra):
         dob=date(2005, 3, 1), phone="0803 123 4567", email="", address="Kongo, Zaria", state="Kaduna", lga="Zaria",
         qualification="SSCE", institution="Barewa College", waec_status="Available", waec_year=2024, num_as=7,
         programme=prog, cohort=cohort, schedule=prog.schedules[0], application_fee=5000, fee=prog.fee,
-        amount_payable=prog.fee, status=status, **extra)
+        amount_payable=prog.fee + (0 if extra.get("application_fee_paid_at") else 5000), status=status, **extra)
     ApplicationEvent.objects.create(application=a, text="Application submitted online")
     return a
 
@@ -42,9 +42,9 @@ def pay(a, ref, purpose, amount, minutes):
                                   status="SUCCESS", verified_at=now + timedelta(minutes=minutes))
 
 
-# 1. Pending (application fee not paid)
-app(1, account("aisha@example.com", "Aisha Garba", "applicant"), "Aisha", "Garba", "fullstack", "Pending")
-# 2. Parent's child awaiting Excellence Award verification
+# 1. Admitted on applying, programme fee (incl. application fee) not paid yet
+app(1, account("aisha@example.com", "Aisha Garba", "applicant"), "Aisha", "Garba", "fullstack", "Admitted")
+# 2. (Paid the application fee separately before 4 Oct 2026) Parent's child awaiting Excellence Award verification
 parent = account("musa@example.com", "Musa Bello", "parent")
 umar = app(2, parent, "Umar", "Bello", "network", "Awaiting Verification", application_fee_paid_at=now)
 AwardRequest.objects.create(application=umar, type="excellence", requested_pct=50, evidence="WAEC 2024 — 7 A's (declared)")

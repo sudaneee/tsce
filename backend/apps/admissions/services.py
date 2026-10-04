@@ -2,10 +2,14 @@
 Admissions business rules (revised flow, 1 Oct 2026):
 
     create_application()        signed-in, email-verified account applies (for self or a child)
-    application_fee_paid()      → admit() automatically, or AWAITING_VERIFICATION for an award request
+                                → admitted at once, or AWAITING_VERIFICATION for an award request
     review_award()              staff verify the WAEC result in person → admit() at 50% or full price
-    sync_programme_quote()      re-price the programme fee at checkout (early bird by payment date)
+    sync_programme_quote()      re-price at checkout (early bird by payment date; application fee added)
     programme_fee_paid()        → ENROLLED: Student record, student number, Enrollment, seat taken
+
+Since 4 Oct 2026 there is no separate application-fee payment: the ₦5,000 is added
+to the programme fee. application_fee_paid() remains only for payments started
+under the earlier flow; those applicants are credited.
 
 Views stay thin and call these; every change of state happens inside a
 transaction and leaves a line in the application history.
@@ -71,7 +75,7 @@ def create_application(data, user) -> Application:
             "duplicate_application", extra={"applicationId": existing.number},
         )
 
-    q = programme_quote(Application(programme=programme, cohort=cohort), settings)
+    q = programme_quote(Application(programme=programme, cohort=cohort, application_fee=settings.application_fee), settings)
     app = Application.objects.create(
         number=f"TSCE/APP/{today().year}/{Sequence.next('app'):05d}",
         user=user,
@@ -94,12 +98,24 @@ def create_application(data, user) -> Application:
         )
         _event(app, "Excellence Award requested — result to be verified in person", actor=user)
 
-    notify(user, "Application received",
-           f"The application {app.number} for {app.full_name} ({programme.name}) has been received. "
-           f"Pay the {naira(app.application_fee)} application fee to complete it.",
-           Notification.Type.APPLICATION, link=MY_APPLICATIONS, email=True)
     if settings.staff_application_alerts:
         notify_staff("New application", f"{app.full_name} applied for {programme.name}.", Notification.Type.APPLICATION)
+    if wants_award:
+        return await_verification(app)
+    return admit(app)
+
+
+def await_verification(app: Application) -> Application:
+    """Excellence Award requested: admission waits for the school to see the original result."""
+    app.status = Application.Status.AWAITING_VERIFICATION
+    app.save(update_fields=["status", "updated_at"])
+    notify(app.user, "Bring the WAEC/NECO result to TSCE",
+           f"The application {app.number} for {app.full_name} ({app.programme.name}) has been received. To confirm the "
+           f"Excellence Award, please visit TSCE ({SiteSettings.load().address}) with the original WAEC/NECO result. "
+           "Admission is confirmed after verification, and you can then pay the programme fee in the portal.",
+           Notification.Type.SCHOLARSHIP, link=MY_APPLICATIONS, email=True)
+    notify_staff("Excellence Award to verify", f"{app.full_name} ({app.number}) will bring a WAEC/NECO result for verification.",
+                 Notification.Type.SCHOLARSHIP)
     return app
 
 
@@ -112,9 +128,10 @@ def admit(app: Application, actor=None) -> Application:
     app.status = Application.Status.ADMITTED
     app.save()
     _event(app, "Admission approved" + (" by the admissions office" if actor else " automatically"), ok=True, actor=actor)
+    fee_note = f" (includes the {naira(q.application_fee)} application fee)" if q.application_fee else ""
     notify(app.user, "Admission approved",
            f"Congratulations! {app.full_name} has been admitted to {app.programme.name} ({app.cohort.name}). "
-           f"Pay the programme fee of {naira(app.amount_payable)} to secure {'the' if app.user.role == User.Role.PARENT else 'your'} seat.",
+           f"Pay the programme fee of {naira(app.amount_payable)}{fee_note} to secure {'the' if app.user.role == User.Role.PARENT else 'your'} seat.",
            Notification.Type.APPLICATION, link=MY_APPLICATIONS, email=True)
     return app
 
@@ -127,8 +144,12 @@ def application_fee_paid(app: Application, payment) -> Application:
         return app
     app.application_fee_paid_at = payment.verified_at or timezone.now()
     app.save(update_fields=["application_fee_paid_at", "updated_at"])
-    _event(app, f"Application fee of {naira(payment.amount)} paid ({payment.reference})", ok=True)
+    _event(app, f"Application fee of {naira(payment.amount)} paid ({payment.reference}) — credited against the programme fee", ok=True)
 
+    if app.status != Application.Status.PENDING:
+        # Already admitted under the single-payment flow: just credit it.
+        sync_programme_quote(app, SiteSettings.load())
+        return app
     award = getattr(app, "award_request", None)
     if award and award.status == AwardRequest.Status.PENDING:
         app.status = Application.Status.AWAITING_VERIFICATION
@@ -152,7 +173,7 @@ def review_award(app: Application, approve: bool, staff_user, note: str = "") ->
     if award is None or award.status != AwardRequest.Status.PENDING:
         raise ServiceError("There is no pending award request on this application.", "no_pending_award")
     if app.status != Application.Status.AWAITING_VERIFICATION:
-        raise ServiceError("The application fee must be paid before the award can be reviewed.", "fee_unpaid")
+        raise ServiceError("This application isn't waiting for award verification.", "not_awaiting_verification")
 
     settings = SiteSettings.load()
     award.status = AwardRequest.Status.APPROVED if approve else AwardRequest.Status.REJECTED
@@ -280,9 +301,7 @@ def reject_application(app: Application, staff_user, note: str) -> Application:
 def send_reminder(app: Application, staff_user) -> str:
     """Nudge the account holder about the next payment due. Returns what was reminded."""
     charge = dj_settings.ZAINPAY["PAYER_CHARGE"]
-    if app.status == Application.Status.PENDING:
-        what, amount = "application fee", app.application_fee
-    elif app.status == Application.Status.ADMITTED:
+    if app.status == Application.Status.ADMITTED:
         what, amount = "programme fee", app.amount_payable
     else:
         raise ServiceError("There is no payment due on this application.", "nothing_due")

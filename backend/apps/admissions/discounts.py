@@ -1,8 +1,10 @@
 """
 Admissions calendar and fee rules.
 
-Two payments: the APPLICATION FEE (flat, SiteSettings.application_fee) and the
-PROGRAMME FEE. Discounts apply to the programme fee only:
+ONE payment (decided 4 Oct 2026): the PROGRAMME FEE, with the application fee
+(SiteSettings.application_fee, ₦5,000) added to it. Applicants who paid the
+application fee separately under the earlier two-step flow are credited.
+Discounts apply to the programme (tuition) part only — never the application fee:
 
   • Early Bird 15%  — programme fee paid before the cohort's early-bird deadline (automatic)
   • Excellence 50%  — WAEC/NECO from 2020 to date with 5 A's or more, verified in person by staff
@@ -64,11 +66,12 @@ def excellence_eligible(settings: SiteSettings, waec_status, waec_year, num_as) 
 
 @dataclass(frozen=True)
 class Quote:
-    fee: int
+    fee: int                  # programme (tuition) fee before discount
     discount_type: str
     discount_pct: int
     discount_amount: int
-    amount_payable: int
+    amount_payable: int       # tuition − discount + application fee (if not already paid)
+    application_fee: int = 0  # the application-fee part of amount_payable
 
 
 def quote(programme, cohort, settings: SiteSettings, on: date | None = None, award_pct: int = 0) -> Quote:
@@ -89,13 +92,19 @@ def quote(programme, cohort, settings: SiteSettings, on: date | None = None, awa
 
 
 def programme_quote(app, settings: SiteSettings, on: date | None = None) -> Quote:
-    """The programme fee for an application, counting its award if approved."""
+    """
+    What this application pays: tuition (with its award or the early bird) plus
+    the application fee — unless that was already paid separately (credited).
+    """
     from .models import AwardRequest
 
     award = getattr(app, "award_request", None)
     approved = award is not None and award.status == AwardRequest.Status.APPROVED
     award_pct = (award.awarded_pct or 0) if approved else 0
-    return quote(app.programme, app.cohort, settings, on, award_pct=award_pct)
+    q = quote(app.programme, app.cohort, settings, on, award_pct=award_pct)
+    app_fee = 0 if getattr(app, "application_fee_paid_at", None) else (app.application_fee or 0)
+    return Quote(fee=q.fee, discount_type=q.discount_type, discount_pct=q.discount_pct,
+                 discount_amount=q.discount_amount, amount_payable=q.amount_payable + app_fee, application_fee=app_fee)
 
 
 def seats_taken(cohort) -> dict[int, int]:

@@ -1,11 +1,11 @@
 """
-Browser test of the full admissions journey (revised flow, 1 Oct 2026):
+Browser test of the full admissions journey (single payment, 4 Oct 2026):
 
 parent registers → verifies email (link read from the dev server's console email)
-→ applies for two children → pays application fees
-→ child 1 admitted automatically → pays programme fee → enrolled
+→ applies for two children (nothing to pay to apply)
+→ child 1 admitted immediately → pays programme fee incl. ₦5,000 application fee → enrolled
 → child 2 requested the Excellence Award → awaiting verification → staff approve
-→ parent pays the 50% programme fee → enrolled
+→ parent pays 50% of tuition + the application fee → enrolled
 """
 import os
 import re
@@ -54,7 +54,8 @@ def apply_for_child(page, first, dob, programme, award=False):
     if award:
         page.check('input[name="awardRequest"][value="excellence"]')
     page.check("#a_declare")
-    page.click("#submitBtn"); page.wait_for_url("**/pages/payment.html?app=*purpose=application_fee*")
+    page.click("#submitBtn")
+    page.wait_for_url("**/pages/my-applications.html*" if award else "**/pages/payment.html?app=*")
 
 
 def pay(page, outcome="success"):
@@ -94,13 +95,8 @@ with sync_playwright() as p:
 
     # Child 1: no award
     apply_for_child(page, "Aisha", "2008-03-01", "fullstack")
-    check("application fee invoice ₦5,300", "5,300" in page.inner_text(".checkout-head"))
-    pay(page)
-    page.wait_for_selector(".success-card")
-    body = page.inner_text(".success-card")
-    check("application fee paid → admitted automatically", "ADMITTED" in body.upper(), body[:200])
-    page.click("text=Pay programme fee"); page.wait_for_url("**purpose=programme_fee*")
-    check("programme fee invoice ₦50,300", "50,300" in page.inner_text(".checkout-head"))
+    page.wait_for_selector("#payNow")
+    check("admitted on submit → one invoice ₦55,300", "55,300" in page.inner_text(".checkout-head"))
     pay(page)
     page.wait_for_selector(".success-card")
     body = page.inner_text(".success-card")
@@ -109,10 +105,8 @@ with sync_playwright() as p:
     # Child 2: Excellence Award
     page.goto(f"{B}/pages/my-applications.html"); page.click("#maNew"); page.wait_for_url("**/application.html*")
     apply_for_child(page, "Umar", "2007-06-09", "network", award=True)
-    pay(page)
-    page.wait_for_selector(".success-card")
-    check("award applicant: told to bring result", "WAEC/NECO" in page.inner_text(".success-card"))
-    page.goto(f"{B}/pages/my-applications.html"); page.wait_for_selector("#maRoot article")
+    page.wait_for_selector("#maRoot article")
+    check("award applicant: told to bring result", "WAEC/NECO" in page.locator("#maRoot article", has_text="Umar").inner_text())
     cards = page.locator("#maRoot article")
     check("two children listed", cards.count() == 2)
     text = page.inner_text("#maRoot")
@@ -126,14 +120,14 @@ with sync_playwright() as p:
     staff.goto(f"{B}/pages/login.html"); staff.fill("#loginEmail", "rabi@tsce.edu.ng"); staff.fill("#loginPassword", "Staff-Pass-2026")
     staff.click("#loginForm button[type=submit]"); staff.wait_for_url("**/staff/dashboard.html")
     res = staff.evaluate(f"API.post('staff/applications/' + encodeURIComponent('{umar_no}') + '/award', {{approve: true, note: 'Original WAEC seen'}})")
-    check("staff approve award → admitted at 50%", res["status"] == "Admitted" and res["amountPayable"] == 25000, str(res)[:200])
+    check("staff approve award → admitted at 50% of tuition + ₦5,000", res["status"] == "Admitted" and res["amountPayable"] == 30000, str(res)[:200])
     staff_ctx.close()
 
     page.reload(); page.wait_for_selector("#maRoot article")
     umar = page.locator("#maRoot article", has_text="Umar")
     check("award approved shown to parent", "Excellence Award approved" in umar.inner_text())
     umar.locator("text=Pay programme fee").click(); page.wait_for_url("**purpose=programme_fee*")
-    check("discounted programme fee ₦25,300", "25,300" in page.inner_text(".checkout-head"))
+    check("discounted programme fee ₦30,300", "30,300" in page.inner_text(".checkout-head"))
     pay(page)
     page.wait_for_selector(".success-card")
     check("child 2 enrolled", "ENROLMENT CONFIRMED" in page.inner_text(".success-card").upper())

@@ -136,6 +136,8 @@ class ApplicationSerializer(serializers.ModelSerializer):
     txRef = serializers.SerializerMethodField()
     applicationFee = serializers.IntegerField(source="application_fee")
     applicationFeePaidAt = serializers.DateTimeField(source="application_fee_paid_at")
+    # The application-fee part of amountPayable (0 if it was paid separately earlier and credited).
+    applicationFeeDue = serializers.SerializerMethodField()
     studentId = serializers.SerializerMethodField()
     awardRequest = serializers.SerializerMethodField()
     history = serializers.SerializerMethodField()
@@ -146,6 +148,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "id", "name", "firstName", "middleName", "lastName", "gender", "dob", "email", "phone", "address", "state",
             "lga", "qualification", "institution", "gradYear", "waecStatus", "waecYear", "numAs", "hasResultFile",
             "programmeId", "programmeName", "intake", "cohortStart", "schedule", "applicationFee", "applicationFeePaidAt",
+            "applicationFeeDue",
             "fee", "discountType", "discountPct",
             "discountAmount", "amountPayable", "status", "paymentStatus", "txRef", "createdAt", "paidAt",
             "studentId", "awardRequest", "history",
@@ -153,6 +156,9 @@ class ApplicationSerializer(serializers.ModelSerializer):
 
     def get_hasResultFile(self, obj):
         return bool(obj.waec_file)
+
+    def get_applicationFeeDue(self, obj):
+        return max(0, obj.amount_payable - (obj.fee - obj.discount_amount))
 
     def get_txRef(self, obj):
         """Reference of the programme-fee payment (the main receipt)."""

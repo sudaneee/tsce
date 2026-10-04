@@ -58,7 +58,7 @@ with sync_playwright() as p:
     page.fill("#aSearch", "aisha"); page.wait_for_timeout(600)
     check("applications: search", page.locator("#appTable tbody tr").count() == 1)
     page.click("#appTable tbody tr"); page.wait_for_selector(".drawer.open .dr-body")
-    check("drawer: shows unpaid application fee", "unpaid" in page.inner_text(".drawer.open .dr-body"))
+    check("drawer: application fee included in the programme fee", "included in the programme fee" in page.inner_text(".drawer.open .dr-body") and "55,000" in page.inner_text(".drawer.open .dr-body"))
     page.click('.drawer.open [data-act="remind"]'); page.wait_for_selector(".toast >> text=Reminder sent")
     check("remind: sent", True)
     page.click('.drawer.open [data-act="reject"]'); page.fill("#anNote", "Incomplete details"); page.click("#anOk")

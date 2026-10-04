@@ -40,7 +40,7 @@ class StaffApiTestCase(TestCase):
         self.staff = User.objects.create_user("rabi@tsce.edu.ng", PW, full_name="Rabi Isa", role="staff", email_verified_at=now)
         self.applicant = User.objects.create_user("aisha@example.com", PW, full_name="Aisha Garba", role="applicant", email_verified_at=now)
         self.parent = User.objects.create_user("musa@example.com", PW, full_name="Musa Bello", role="parent", email_verified_at=now)
-        self.a1 = self.make_app(self.applicant, 1, "Aisha")
+        self.a1 = self.make_app(self.applicant, 1, "Aisha", status="Admitted", amount_payable=55000)
         self.a2 = self.make_app(self.parent, 2, "Umar", programme="network", status="Awaiting Verification",
                                 application_fee_paid_at=now)
         AwardRequest.objects.create(application=self.a2, type="excellence", requested_pct=50, evidence="WAEC 2024 — 7 A's")
@@ -79,7 +79,7 @@ class StaffApplicationsTests(StaffApiTestCase):
     def test_list_filters_and_counts(self):
         self.as_(self.staff)
         data = self.client.get("/api/staff/applications").json()
-        self.assertEqual(data["counts"], {"Pending": 1, "Awaiting Verification": 1, "all": 2})
+        self.assertEqual(data["counts"], {"Admitted": 1, "Awaiting Verification": 1, "all": 2})
         rows = self.client.get("/api/staff/applications", {"status": "Awaiting Verification"}).json()["results"]
         self.assertEqual([r["id"] for r in rows], ["TSCE/APP/2026/00002"])
         self.assertEqual((rows[0]["account"]["type"], rows[0]["award"]["status"]), ("parent", "Pending"))
@@ -101,7 +101,7 @@ class StaffApplicationsTests(StaffApiTestCase):
     def test_reject_and_remind(self):
         self.as_(self.staff)
         res = self.post(f"/api/staff/applications/{self.a1.number}/remind")
-        self.assertEqual(res.json()["reminded"], "application fee")
+        self.assertEqual(res.json()["reminded"], "programme fee")
         self.assertTrue(Notification.objects.filter(recipient=self.applicant, title__startswith="Reminder").exists())
         self.assertEqual(self.post(f"/api/staff/applications/{self.a2.number}/remind").json()["code"], "nothing_due")
 

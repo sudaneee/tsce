@@ -40,7 +40,7 @@ with sync_playwright() as p:
     page.goto(f"{B}/pages/admissions.html"); page.wait_for_selector("#feeTable tr")
     check("admissions: fee table rows", page.locator("#feeTable tr").count() == 11)
     text = page.inner_text("main")
-    check("admissions: five-step two-fee flow", "Create an account" in text and "Pay the application fee" in text and "Pay the programme fee" in text)
+    check("admissions: five-step single-payment flow", "Create an account" in text and "nothing to pay to apply" in text and "Pay the programme fee" in text and "Pay the application fee" not in text)
     check("admissions: scholarship removed", "Performance Scholarship" not in text)
 
     page.goto(f"{B}/pages/application.html"); page.wait_for_selector("#wizardRoot .card")

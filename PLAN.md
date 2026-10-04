@@ -15,20 +15,20 @@ Turning the approved frontend demo (HTML/CSS/JS + localStorage) into a productio
 | Instructors | Instructors do **not** log in. Admin/staff enter attendance and results. Roles: `applicant`, `student`, `staff`, `admin`. |
 | Initial data | Production starts **empty** of people, applications and payments. Seeded: school info (settings) and the 11 real programmes from the flyer. A separate `seed_demo` command exists only for a demo/staging instance. |
 
-## Revised admissions flow (decided 1 Oct 2026, replaces the demo's "pay full fee on applying")
+## Revised admissions flow (decided 1 Oct 2026; single payment since 4 Oct 2026)
 
 ```
 Register (Student account for yourself, or Parent account for your children)
   → verify email (link sent by email)
   → fill application (a parent adds one application per child)
-  → pay the APPLICATION FEE (₦5,000 + ₦300 Zainpay charge, non-refundable, one per application)
-  → ┬─ no award requested:  ADMITTED automatically → pay PROGRAMME FEE → ENROLLED
+  → ┬─ no award requested:  ADMITTED immediately → pay PROGRAMME FEE (+ ₦5,000 application fee) → ENROLLED
     └─ Excellence Award requested (WAEC 2020+ with 5 A's): AWAITING VERIFICATION
          → applicant visits TSCE with the result → staff approve (50%) or decline the award
          → ADMITTED (award approved: 50% off; declined: normal price) → pay programme fee → ENROLLED
 ```
 
-- **Two payments:** the application fee, and the programme fee (₦45,000/₦50,000). Discounts apply only to the programme fee and don't stack (highest wins): an approved Excellence Award (50%) or the early bird (15%, judged on the programme-fee payment date).
+- **One payment (client decision, 4 Oct 2026 — the separate application fee was putting applicants off):** the programme fee (₦45,000/₦50,000) with the ₦5,000 application fee added, plus the ₦300 Zainpay charge once. Nothing is paid to apply. Discounts apply to the tuition part only, never the application fee, and don't stack (highest wins): an approved Excellence Award (50%) or the early bird (15%, judged on the payment date). E.g. ₦50,000 → ₦55,000; with the award ₦25,000 + ₦5,000 = ₦30,000.
+- **Earlier separate application-fee payments** (1–4 Oct 2026) are credited: those applicants pay the programme fee without the ₦5,000. `manage.py apply_single_payment` moved applications still waiting on the old fee into the new flow.
 - **The Performance Scholarship no longer exists.** Qualifying applicants may skip the award and be admitted automatically.
 - **Seats** are only taken when the programme fee is paid. There's no automatic lapse of unpaid admissions (staff can reject manually).
 - **Accounts:** email + password, email must be verified before applying. A Parent account manages everything for its children (applications, payments, and later the child's portal view). A self-applicant's account becomes their student login on enrolment.

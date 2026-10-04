@@ -109,14 +109,14 @@ class CreateApplicationTests(ApiTestCase):
                          resultFile=SimpleUploadedFile("waec.pdf", PDF, content_type="application/pdf"))
         self.assertEqual(res.status_code, 201, res.content)
         body = res.json()
-        self.assertEqual((body["id"], body["status"], body["applicationFee"], body["applicationFeePaidAt"]),
-                         ("TSCE/APP/2026/00001", "Pending", 5000, None))
-        self.assertEqual((body["fee"], body["amountPayable"]), (50000, 50000))
+        self.assertEqual((body["id"], body["status"], body["applicationFee"], body["applicationFeeDue"]),
+                         ("TSCE/APP/2026/00001", "Admitted", 5000, 5000))  # admitted on applying (4 Oct 2026)
+        self.assertEqual((body["fee"], body["amountPayable"]), (50000, 55000))  # application fee added
         app = Application.objects.get()
         self.assertEqual(app.email, "aisha@example.com")  # self-applicants always use their account email
         self.assertEqual(app.phone, "0803 123 4567")
         self.assertTrue(app.waec_file.storage.exists(app.waec_file.name))
-        self.assertTrue(Notification.objects.filter(recipient=user, title="Application received").exists())
+        self.assertTrue(Notification.objects.filter(recipient=user, title="Admission approved").exists())
 
     def test_parent_applies_for_several_children(self):
         self.sign_in(self.account("rabi.musa@example.com", role=User.Role.PARENT, name="Rabi Musa"))
@@ -157,7 +157,8 @@ class CreateApplicationTests(ApiTestCase):
     def test_excellence_award_request(self):
         self.sign_in(self.account())
         self.assertEqual(self.apply(awardRequest="excellence", waecYear="2018").json()["code"], "not_eligible")
-        self.assertEqual(self.apply(awardRequest="excellence").status_code, 201)
+        res = self.apply(awardRequest="excellence")
+        self.assertEqual((res.status_code, res.json()["status"]), (201, "Awaiting Verification"))
         award = AwardRequest.objects.get()
         self.assertEqual((award.type, award.requested_pct, award.status), ("excellence", 50, "Pending"))
 
