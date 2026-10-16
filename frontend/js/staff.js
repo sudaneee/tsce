@@ -9,6 +9,7 @@ const Staff = (() => {
     const STEPS = ["Applied", "Admission", "Programme fee", "Enrolled"];
     const STAGE = { Pending: 1, "Awaiting Verification": 1, Admitted: 2, Enrolled: 4, Rejected: 1 };
     const PURPOSE = { application_fee: "Application fee", programme_fee: "Programme fee" };
+    const INSTALLMENT = { 1: " (1st installment)", 2: " (balance)" };
     const fail = (title) => (e) => UI.toast(title, e.message, "error", 7000);
     const enc = encodeURIComponent;
 
@@ -32,7 +33,7 @@ const Staff = (() => {
             acts.push(`<button class="btn btn-soft-danger" data-act="award-no"><i class="fa-solid fa-xmark"></i> Decline award</button>`,
                 `<button class="btn btn-success" data-act="award-yes"><i class="fa-solid fa-award"></i> Approve award (${award.requestedPct}%)</button>`);
         }
-        if (a.status === "Admitted") acts.push(`<button class="btn btn-outline" data-act="remind"><i class="fa-regular fa-bell"></i> Send reminder</button>`);
+        if (a.status === "Admitted" || a.paymentStatus === "Part Paid") acts.push(`<button class="btn btn-outline" data-act="remind"><i class="fa-regular fa-bell"></i> Send reminder</button>`);
         if (!["Enrolled", "Rejected"].includes(a.status)) acts.push(`<button class="btn btn-ghost" data-act="reject" style="color:var(--danger)"><i class="fa-solid fa-ban"></i> Reject</button>`);
 
         const d = UI.drawer({
@@ -43,6 +44,7 @@ const Staff = (() => {
                     ${kv("Programme", UI.esc(a.programmeName), true)}${kv("Schedule", UI.esc(a.schedule))}${kv("Intake", UI.esc(a.intake))}
                     ${kv("Application fee", a.applicationFeePaidAt ? `${UI.naira(a.applicationFee)} · paid separately ${UI.date(a.applicationFeePaidAt)}` : `${UI.naira(a.applicationFee)} · included in the programme fee`)}
                     ${kv("Programme fee", `${UI.naira(a.amountPayable)}${a.discountAmount ? ` <span class="small muted">(${Applications.discountName(a.discountType)} −${UI.naira(a.discountAmount)})</span>` : ""} · ${UI.esc(a.paymentStatus)}`)}
+                    ${a.paymentStatus === "Part Paid" ? kv("Installments", `${UI.naira(a.amountPaid)} paid · <b>${UI.naira(a.balance)} balance</b>${a.balanceDueDate ? ` due ${UI.date(a.balanceDueDate)}` : ""} <span class="small muted">— results and certificate withheld until paid</span>`, true) : ""}
                     ${award ? kv("Excellence Award", `${UI.badge(award.status)} ${award.awardedPct ? `${award.awardedPct}%` : ""} ${award.note ? `<span class="small muted">— ${UI.esc(award.note)}</span>` : ""}`, true) : ""}
                     ${a.studentId ? kv("Student number", `<span class="mono">${UI.esc(a.studentId)}</span>`) : ""}
                 </div></div>
@@ -57,7 +59,7 @@ const Staff = (() => {
                     ${kv("Qualification", UI.esc(a.qualification))}${kv("Graduation year", a.gradYear || "—")}${kv("Institution", UI.esc(a.institution), true)}
                     ${kv("WAEC/NECO", a.waecStatus === "Available" ? `${a.waecYear} · ${a.numAs} A's` : UI.esc(a.waecStatus))}
                     ${kv("Result document", a.waecFileUrl ? `<a href="${a.waecFileUrl}" target="_blank" rel="noopener"><i class="fa-regular fa-file-lines"></i> Open uploaded result</a>` : `<span class="muted">Not uploaded</span>`)}</div></div>
-                <div class="dr-section"><h4>Payments</h4>${a.payments.length ? `<ul class="list">${a.payments.map((p) => `<li class="list-item"><span class="icon-tile ${p.status === "SUCCESS" ? "green" : p.status === "FAILED" ? "red" : ""}"><i class="fa-solid fa-naira-sign"></i></span><div class="grow"><strong>${PURPOSE[p.purpose] || p.purpose}${p.kind === "refund" ? " refund" : ""} · ${UI.naira(p.amount)}</strong><small class="mono">${UI.esc(p.ref)} · ${UI.dateTime(p.verifiedAt || p.createdAt)}</small></div>${UI.badge(p.status)}</li>`).join("")}</ul>` : `<p class="muted small">No payments yet.</p>`}</div>
+                <div class="dr-section"><h4>Payments</h4>${a.payments.length ? `<ul class="list">${a.payments.map((p) => `<li class="list-item"><span class="icon-tile ${p.status === "SUCCESS" ? "green" : p.status === "FAILED" ? "red" : ""}"><i class="fa-solid fa-naira-sign"></i></span><div class="grow"><strong>${PURPOSE[p.purpose] || p.purpose}${INSTALLMENT[p.installment] || ""}${p.kind === "refund" ? " refund" : ""} · ${UI.naira(p.amount)}</strong><small class="mono">${UI.esc(p.ref)} · ${UI.dateTime(p.verifiedAt || p.createdAt)}</small></div>${UI.badge(p.status)}</li>`).join("")}</ul>` : `<p class="muted small">No payments yet.</p>`}</div>
                 <div class="dr-section"><h4>Activity</h4><ul class="history">${[...a.history].reverse().map((h) => `<li class="${h.ok ? "ok" : ""}"><strong>${UI.esc(h.text)}</strong><small>${UI.dateTime(h.at)}</small></li>`).join("")}</ul></div>`,
             footer: `<button class="btn btn-ghost" id="adPrint" title="Print"><i class="fa-solid fa-print"></i></button>${acts.join("")}`
         });
@@ -129,14 +131,14 @@ Pages["staff-dashboard"] = async function (view, { session }) {
         <div class="kpis">
             ${kpi("Applications", A.total || 0, "fa-file-signature", "", `${A["Awaiting Verification"] || 0} awaiting award verification`, "applications.html")}
             ${kpi("Admitted", A.Admitted || 0, "fa-user-check", "cyan", "Programme fee not yet paid", "applications.html?status=Admitted")}
-            ${kpi("Enrolled", s.enrolled, "fa-user-graduate", "green", "Programme fee paid", "applications.html?status=Enrolled")}
+            ${kpi("Enrolled", s.enrolled, "fa-user-graduate", "green", "Paid in full or 1st installment", "applications.html?status=Enrolled")}
             ${kpi("Awards to verify", s.awardsToVerify, "fa-award", "gold", "Waiting for a school visit", "scholarships.html")}
             ${kpi("Collected", UI.naira(s.revenue.total), "fa-naira-sign", "grad", `${UI.naira(s.revenue.lastWeek)} in the last 7 days`, "payments.html")}
         </div>
         <div class="dash-grid cols-12">
             <div class="panel span-7"><div class="panel-head"><div><h3><i class="fa-solid fa-clock-rotate-left"></i>Latest applications</h3></div><a class="btn btn-sm btn-soft" href="applications.html">View all</a></div>
                 ${recent.length ? `<ul class="list">${recent.map((a) => `<li class="list-item" style="cursor:pointer" data-app="${UI.esc(a.id)}">${UI.avatar(a.name, "sm")}<div class="grow"><strong>${UI.esc(a.name)}</strong><small>${UI.esc(a.programmeName)} · ${UI.timeAgo(a.createdAt)}${a.account.type === "parent" ? ` · via ${UI.esc(a.account.name)}` : ""}</small></div>${UI.badge(a.status)}</li>`).join("")}</ul>` : UI.empty({ icon: "fa-inbox", title: "No applications yet" })}</div>
-            <div class="panel span-5"><div class="panel-head"><div><h3><i class="fa-solid fa-chair"></i>Seats taken</h3><p>Programme fee paid · ${UI.esc(s.intake || "")}</p></div></div><div class="panel-body">
+            <div class="panel span-5"><div class="panel-head"><div><h3><i class="fa-solid fa-chair"></i>Seats taken</h3><p>Programme fee paid (in full or 1st installment) · ${UI.esc(s.intake || "")}</p></div></div><div class="panel-body">
                 ${s.seats.length ? s.seats.map((r) => `<div class="mb-2"><div class="flex between small mb-1"><b>${UI.esc(r.programme)}</b><span class="muted">${r.taken} / ${r.capacity}</span></div><div class="progress ${r.taken / r.capacity > .85 ? "gold" : ""}"><span style="width:${Math.round(r.taken / r.capacity * 100)}%"></span></div></div>`).join("") : `<p class="muted small mb-0">No enrolments yet for this intake.</p>`}
                 <div class="divider"></div>
                 <div class="flex between small"><span class="muted">Application fees</span><b>${UI.naira(s.revenue.applicationFees)}</b></div>
@@ -169,7 +171,7 @@ Pages["staff-applications"] = function (view) {
             { key: "name", label: "Applicant", render: (a) => `<div class="person">${UI.avatar(a.name, "sm")}<div><strong>${UI.esc(a.name)}</strong><small>${a.account.type === "parent" ? `Parent: ${UI.esc(a.account.name)}` : UI.esc(a.account.email)}</small></div></div>` },
             { key: "programmeName", label: "Programme", render: (a) => `<span class="small">${UI.esc(a.programmeName)}</span>` },
             { key: "createdAt", label: "Applied", render: (a) => `<span class="small">${UI.date(a.createdAt)}</span>` },
-            { key: "applicationFeePaidAt", label: "App. fee", sortValue: (a) => a.applicationFeePaidAt || "", render: (a) => a.applicationFeePaidAt ? `<span class="small">Paid separately</span>` : `<span class="small muted">In programme fee</span>` },
+            { key: "paymentStatus", label: "Programme fee", sortValue: (a) => a.paymentStatus, render: (a) => UI.badge(a.paymentStatus) + (a.paymentStatus === "Part Paid" ? `<div class="small muted">${UI.naira(a.balance)} balance</div>` : "") },
             { key: "award", label: "Award", sortValue: (a) => a.award?.status || "", render: (a) => a.award ? UI.badge(a.award.status) : `<span class="muted small">—</span>` },
             { key: "status", label: "Status", render: (a) => UI.badge(a.status) }
         ],
@@ -195,7 +197,7 @@ Pages["staff-applications"] = function (view) {
     UI.$("#appExport").onclick = () => UI.downloadCSV("tsce-applications.csv", rows.map((a) => ({
         Application: a.id, Applicant: a.name, Phone: a.phone, Email: a.email, Account: a.account.email, AccountType: a.account.type,
         Programme: a.programmeName, Intake: a.intake, Applied: UI.date(a.createdAt), ApplicationFee: a.applicationFeePaidAt ? "Paid separately" : "Included in programme fee",
-        Award: a.award?.status || "", Status: a.status, ProgrammeFee: a.amountPayable, ProgrammeFeeStatus: a.paymentStatus
+        Award: a.award?.status || "", Status: a.status, ProgrammeFee: a.amountPayable, ProgrammeFeeStatus: a.paymentStatus, AmountPaid: a.amountPaid, Balance: a.balance, BalanceDue: a.balanceDueDate || ""
     })));
     load();
     const open = UI.param("id"); if (open) Staff.openApplication(open, load);
@@ -441,6 +443,7 @@ Pages["staff-settings"] = async function (view) {
                     ${f("a_d", "cohortDate", "Classes start", adm.cohortDate, "date")}${f("a_e", "earlyBirdDeadline", "Early bird: programme fee paid before", adm.earlyBirdDeadline, "date")}
                     ${f("a_f", "applicationFee", "Application fee (₦, added to the programme fee)", adm.applicationFee, "number")}
                     <div class="span-2">${sw("admissions", "acceptingApplications", adm.acceptingApplications, "Accept new applications", "Turn off to close the application form immediately")}</div>
+                    <div class="span-2">${sw("admissions", "allowInstallments", adm.allowInstallments, "Allow installment payments", "50% of the programme fee (+ application fee) to enrol, the balance before the programme ends")}</div>
                 </div></div><div class="table-foot"><span class="small muted">Changes apply to new applications and payments from now on.</span><button class="btn btn-primary">Save</button></div></form>
                 <form class="panel" id="disc" data-sec="discounts" novalidate><div class="panel-head"><div><h3><i class="fa-solid fa-percent"></i>Discounts</h3><p>Programme-fee discounts — they don't stack; the better one applies</p></div></div><div class="panel-body"><div class="form-grid">
                     ${f("d_e", "earlyBirdPct", "Early bird (%)", disc.earlyBirdPct, "number")}${f("d_x", "excellencePct", "Excellence Award (%)", disc.excellencePct, "number")}

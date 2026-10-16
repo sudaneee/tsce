@@ -127,6 +127,10 @@ class ApplicationSerializer(serializers.ModelSerializer):
     paymentStatus = serializers.CharField(source="payment_status")
     createdAt = serializers.DateTimeField(source="created_at")
     paidAt = serializers.DateTimeField(source="paid_at")
+    amountPaid = serializers.IntegerField(source="amount_paid")
+    balance = serializers.IntegerField()
+    balanceDueDate = serializers.DateField(source="balance_due_date")
+    firstInstallment = serializers.SerializerMethodField()
     middleName = serializers.CharField(source="middle_name")
     waecStatus = serializers.CharField(source="waec_status")
     waecYear = serializers.IntegerField(source="waec_year")
@@ -150,7 +154,8 @@ class ApplicationSerializer(serializers.ModelSerializer):
             "programmeId", "programmeName", "intake", "cohortStart", "schedule", "applicationFee", "applicationFeePaidAt",
             "applicationFeeDue",
             "fee", "discountType", "discountPct",
-            "discountAmount", "amountPayable", "status", "paymentStatus", "txRef", "createdAt", "paidAt",
+            "discountAmount", "amountPayable", "amountPaid", "balance", "balanceDueDate", "firstInstallment",
+            "status", "paymentStatus", "txRef", "createdAt", "paidAt",
             "studentId", "awardRequest", "history",
         ]
 
@@ -160,9 +165,15 @@ class ApplicationSerializer(serializers.ModelSerializer):
     def get_applicationFeeDue(self, obj):
         return max(0, obj.amount_payable - (obj.fee - obj.discount_amount))
 
+    def get_firstInstallment(self, obj):
+        """What paying in two halves would cost now (before any payment), else None."""
+        from .discounts import first_installment
+
+        return first_installment(obj) if obj.amount_paid == 0 and obj.status == Application.Status.ADMITTED else None
+
     def get_txRef(self, obj):
-        """Reference of the programme-fee payment (the main receipt)."""
-        paid = obj.payments.filter(kind="charge", purpose="programme_fee", status="SUCCESS").order_by("verified_at").first()
+        """Reference of the latest programme-fee payment (the main receipt)."""
+        paid = obj.payments.filter(kind="charge", purpose="programme_fee", status="SUCCESS").order_by("-verified_at").first()
         return paid.reference if paid else None
 
     def get_studentId(self, obj):

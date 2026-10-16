@@ -86,9 +86,10 @@ With `ZAINPAY_ENVIRONMENT=sandbox`:
 1. Register a parent account using a real inbox you can read, and click the verification link.
 2. Apply for a child. The child is admitted straight away and you land on the programme-fee invoice (programme fee + ₦5,000 application fee + ₦300 charge).
 3. Pay it with Zainpay's **sandbox** transfer details. You should come back to the success page, and the child should show as **Enrolled** with a student number.
-4. Apply again requesting the Excellence Award, then approve it in Staff → Excellence Awards and check that the tuition is halved (the ₦5,000 application fee is not discounted).
-5. In the Django admin (`/admin/` → Webhook events), confirm webhooks arrived with **signature valid** ticked.
-6. Run `sudo systemctl start tsce-reconcile` and check `journalctl -u tsce-reconcile -n 20`.
+4. Apply again and choose **Pay 50% now**: the child is enrolled with a balance; pay the balance from My applications.
+5. Apply again requesting the Excellence Award, then approve it in Staff → Excellence Awards and check that the tuition is halved (the ₦5,000 application fee is not discounted).
+6. In the Django admin (`/admin/` → Webhook events), confirm webhooks arrived with **signature valid** ticked.
+7. Run `sudo systemctl start tsce-reconcile` and check `journalctl -u tsce-reconcile -n 20`.
 
 Then clear the test data (see "Starting clean" below) and switch to live.
 

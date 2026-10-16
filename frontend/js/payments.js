@@ -119,6 +119,7 @@ const Payments = (() => {
 
     /** Programme fee − discount + application fee (included since 4 Oct 2026) = amount. */
     function receiptLines(p) {
+        if (p.installment === 1 || p.installment === 2) return `<tr><td>Payment</td><td>${p.installment === 1 ? "1st installment (50% of the programme fee + application fee)" : "Balance of the programme fee"}</td></tr>`;
         if (!p.fee || p.fee === p.amount) return "";
         const discount = p.discount || 0, appFee = p.amount - (p.fee - discount);
         if (appFee < 0) return `<tr><td>Programme fee</td><td>${UI.naira(p.fee)}</td></tr><tr><td>Discount applied</td><td style="color:var(--success)">−${UI.naira(p.fee - p.amount)}</td></tr>`;
@@ -249,15 +250,21 @@ Pages["payment"] = async function () {
         wrap.innerHTML = card({ icon: "fa-id-card", title: "Excellence Award verification pending", text: `Bring the original WAEC/NECO result to TSCE (${UI.esc(Site.settings?.institution?.address || "")}). You can pay the programme fee once admissions has verified it.`, action: mine });
         return;
     }
-    if (app.status !== "Admitted") {
+    const isBalance = app.paymentStatus === "Part Paid";
+    if (app.status !== "Admitted" && !isBalance) {
         wrap.innerHTML = card({ icon: "fa-hourglass-half", title: "Not ready for payment yet", text: "This application is still being processed. Follow it from My applications.", action: mine });
         return;
     }
-    const due = app.amountPayable;
+    // Installments (5 Oct 2026): pay in full, or 50% of the tuition + the application fee now and the balance later.
+    const canSplit = !isBalance && pset.allowInstallments !== false && app.firstInstallment;
+    let plan = canSplit && UI.param("plan") === "half" ? "half" : "full";
+    const dueFor = (p) => isBalance ? app.balance : p === "half" ? app.firstInstallment : app.amountPayable;
+    const balanceDate = app.balanceDueDate ? UI.dateLong(Site.day(app.balanceDueDate)) : "";
 
     const prog = Programmes.get(app.programmeId) || { name: app.programmeName, weeks: "", color: "#1846D6", icon: "fa-layer-group" };
     const env = pset.environment;
-    const charge = pset.payerCharge || 0, total = due + charge;
+    const charge = pset.payerCharge || 0;
+    let due = dueFor(plan), total = due + charge;
     const methods = [pset.allowCard !== false && ["fa-regular fa-credit-card", "Card", "Visa, Mastercard, Verve"], pset.allowTransfer !== false && ["fa-solid fa-building-columns", "Bank transfer", "Pay from any Nigerian bank app"]].filter(Boolean);
     const alerts = {
         failed: `<div class="alert danger mb-2" role="alert"><i class="fa-solid fa-circle-xmark"></i><p><b>Your last payment didn't go through.</b> No money was taken for it. You can try again below, with another card or by bank transfer.</p></div>`,
@@ -270,6 +277,11 @@ Pages["payment"] = async function () {
             <div class="checkout">
                 <div class="checkout-head"><div class="zp-logo"><span class="zp-mark"><i class="fa-solid fa-bolt"></i></span><div>Zainpay<small>Secure checkout${env && env !== "live" ? " · " + UI.esc(env) : ""}</small></div></div>
                     <div class="amt"><small>Total to pay</small><strong>${UI.naira(total)}</strong></div></div>
+                ${canSplit ? `<div style="padding:22px 24px 0"><p class="small mb-1" style="font-weight:600">How would you like to pay?</p><div class="stack" id="planPick" role="radiogroup" aria-label="Payment plan">
+                    <label class="option-card"><input type="radio" name="plan" value="full" ${plan === "full" ? "checked" : ""}><span class="oc-radio"></span><span><strong>Pay in full · ${UI.naira(app.amountPayable + charge)}</strong><small>One payment — nothing more to pay.</small></span></label>
+                    <label class="option-card"><input type="radio" name="plan" value="half" ${plan === "half" ? "checked" : ""}><span class="oc-radio"></span><span><strong>Pay 50% now · ${UI.naira(app.firstInstallment + charge)}</strong><small>Enrols ${user.role === "parent" ? "your child" : "you"} and secures the seat. The balance of ${UI.naira(app.amountPayable - app.firstInstallment)}${charge ? ` (+ ${UI.naira(charge)} charge)` : ""} is due before the programme ends; results and the certificate are released once it's paid.</small></span></label>
+                </div></div>` : ""}
+                ${isBalance ? `<div style="padding:22px 24px 0"><div class="alert mb-0"><i class="fa-solid fa-scale-balanced"></i><p><b>Programme fee balance.</b> ${UI.naira(app.amountPaid)} of ${UI.naira(app.amountPayable)} is paid.${balanceDate ? ` The balance is due by <b>${balanceDate}</b>.` : ""} Results and the certificate are released once it's paid.</p></div></div>` : ""}
                 <div style="padding:22px 24px 6px">
                     <p class="small muted mb-2">You'll be taken to Zainpay's secure payment page${methods.length === 1 && methods[0][1] === "Bank transfer" ? " to pay by bank transfer" : ""}, then brought straight back here.${pset.allowCard !== false ? " TSCE never sees or stores your card details." : ""}</p>
                     <ul class="list">${methods.map(([i, t, d]) => `<li class="list-item"><span class="icon-tile"><i class="${i}"></i></span><div class="grow"><strong>${t}</strong><small>${d}</small></div></li>`).join("")}</ul>
@@ -281,7 +293,7 @@ Pages["payment"] = async function () {
         </div>
         <aside class="order-summary">
             <div class="card card-pad">
-                <div class="flex between mb-2"><h3 class="mb-0" style="font-size:1.05rem">Programme fee</h3>${UI.badge(result === "failed" ? "Failed" : "Pending Payment")}</div>
+                <div class="flex between mb-2"><h3 class="mb-0" style="font-size:1.05rem">Programme fee${isBalance ? " balance" : ""}</h3>${UI.badge(result === "failed" ? "Failed" : "Pending Payment")}</div>
                 <div class="flex mb-2" style="align-items:flex-start"><span class="icon-tile" style="background:${prog.color};color:#fff"><i class="fa-solid ${prog.icon}"></i></span><div><strong style="font-family:var(--font-head)">${UI.esc(app.programmeName)}</strong><div class="small muted">${prog.weeks ? prog.weeks + " weeks · " : ""}${UI.esc(app.intake)}</div></div></div>
                 <div class="bank-box" style="margin-bottom:14px">
                     <div class="row"><span class="muted">Applicant</span><strong>${UI.esc(app.name)}</strong></div>
@@ -292,19 +304,29 @@ Pages["payment"] = async function () {
                     <div class="fee-row"><span>Programme Fee</span><span>${UI.naira(app.fee)}</span></div>
                     ${app.discountAmount ? `<div class="fee-row"><span>${Applications.discountName(app.discountType)} (${app.discountPct}%)</span><span class="neg">−${UI.naira(app.discountAmount)}</span></div>` : ""}
                     ${app.applicationFeeDue ? `<div class="fee-row"><span>Application fee (non-refundable)</span><span>${UI.naira(app.applicationFeeDue)}</span></div>` : app.applicationFeePaidAt ? `<div class="fee-row"><span>Application fee</span><span class="muted">already paid</span></div>` : ""}
-                    <div class="fee-row total"><span>Amount Payable</span><span>${UI.naira(due)}</span></div>
-                    ${charge ? `<div class="fee-row"><span>Zainpay transaction charge</span><span>${UI.naira(charge)}</span></div><div class="fee-row total"><span>Total to pay</span><span>${UI.naira(total)}</span></div>` : ""}
+                    <div class="fee-row total"><span>Programme fee total</span><span>${UI.naira(app.amountPayable)}</span></div>
+                    ${isBalance ? `<div class="fee-row"><span>Paid so far</span><span class="neg">−${UI.naira(app.amountPaid)}</span></div>` : ""}
+                    <div class="fee-row ${isBalance || canSplit ? "" : "hidden"}" id="sumDueRow"><span id="sumDueLabel">${isBalance ? "Balance due now" : "Paying now"}</span><span id="sumDue">${UI.naira(due)}</span></div>
+                    ${charge ? `<div class="fee-row"><span>Zainpay transaction charge</span><span>${UI.naira(charge)}</span></div><div class="fee-row total"><span>Total to pay now</span><span id="sumTotal">${UI.naira(total)}</span></div>` : ""}
                 </div>
                 <div class="flex mt-2 small muted"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Instant confirmation & e-receipt</div>
-                <div class="flex mt-1 small muted"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Enrolment confirmed after payment</div>
+                <div class="flex mt-1 small muted"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> ${isBalance ? "Fees cleared after payment" : "Enrolment confirmed after payment"}</div>
             </div>
         </aside></div>`;
 
     const payBtn = UI.$("#payNow");
+    UI.$$('#planPick input[name="plan"]').forEach((r) => r.addEventListener("change", () => {
+        plan = r.value; due = dueFor(plan); total = due + charge;
+        UI.$(".checkout-head .amt strong").textContent = UI.naira(total);
+        payBtn.innerHTML = `<i class="fa-solid fa-lock"></i> Pay ${UI.naira(total)} securely`;
+        UI.$("#sumDue").textContent = UI.naira(due);
+        UI.$("#sumDueLabel").textContent = plan === "half" ? "Paying now (1st installment)" : "Paying now";
+        if (UI.$("#sumTotal")) UI.$("#sumTotal").textContent = UI.naira(total);
+    }));
     payBtn.onclick = async () => {
         payBtn.disabled = true; payBtn.innerHTML = `<span class="spinner"></span> Connecting to Zainpay…`;
         try {
-            const r = await API.post("payments/initialize", { applicationId: app.id, purpose });
+            const r = await API.post("payments/initialize", { applicationId: app.id, purpose, plan });
             if (r.amount !== due) {
                 const go = await UI.confirm({ title: "Amount updated", message: `The early-bird period has ended, so the amount payable is now <b>${UI.naira(r.amount)}</b>${charge ? ` (plus the ${UI.naira(charge)} Zainpay charge)` : ""}.`, confirmText: `Pay ${UI.naira(r.amount + charge)}`, icon: "fa-circle-info" });
                 if (!go) { location.reload(); return; }
@@ -325,7 +347,7 @@ Pages["payment"] = async function () {
             try {
                 const p = await API.post(`payments/${encodeURIComponent(lastRef)}/check`);
                 if (p.status === "SUCCESS") { location.href = `success.html?ref=${encodeURIComponent(p.ref)}`; return; }
-                if (p.status === "FAILED") { location.href = `payment.html?app=${encodeURIComponent(app.id)}&purpose=${purpose}&result=failed`; return; }
+                if (p.status === "FAILED") { location.href = `payment.html?app=${encodeURIComponent(app.id)}&purpose=${purpose}&plan=${plan}&result=failed`; return; }
                 if (manual) UI.toast("Still processing", "Zainpay hasn't confirmed this payment yet. We'll keep checking.", "info");
             } catch (e) { if (manual) UI.toast("Couldn't check", e.message, "warning"); }
             finally { busy = false; }
@@ -359,12 +381,16 @@ Pages["success"] = async function () {
     const charge = Site.settings?.payments?.payerCharge || 0;
     const headline = isAppFee
         ? (app.status === "Awaiting Verification" ? "APPLICATION FEE PAID" : "APPLICATION FEE PAID — ADMITTED")
-        : "ENROLMENT CONFIRMED";
+        : pay.installment === 2 ? "PROGRAMME FEE FULLY PAID" : "ENROLMENT CONFIRMED";
+    const balanceNote = pay.installment === 1 && app.balance
+        ? ` The balance of <b>${UI.naira(app.balance)}</b> is due${app.balanceDueDate ? ` by <b>${UI.dateLong(Site.day(app.balanceDueDate))}</b>` : " before the programme ends"}.`
+        : "";
     const intro = isAppFee
         ? (app.status === "Awaiting Verification"
             ? `Thank you. The application for ${UI.esc(app.name)} is complete. <b>Next: bring the original WAEC/NECO result to TSCE</b> (${UI.esc(Site.settings?.institution?.address || "")}) to verify the Excellence Award.`
             : `Congratulations — ${UI.esc(app.name)} has been <b>admitted</b> to ${UI.esc(app.programmeName)}. Pay the programme fee to secure ${parentAcct ? "the" : "your"} seat.`)
-        : `Thank you. ${UI.esc(app.name)} is enrolled${pay.studentId ? ` — student number <b>${UI.esc(pay.studentId)}</b>` : ""}.`;
+        : pay.installment === 2 ? `Thank you. The programme fee for ${UI.esc(app.name)} is now fully paid.`
+        : `Thank you. ${UI.esc(app.name)} is enrolled${pay.studentId ? ` — student number <b>${UI.esc(pay.studentId)}</b>` : ""}.${balanceNote}`;
     const primary = isAppFee
         ? (app.status === "Admitted"
             ? `<a class="btn btn-grad" href="payment.html?app=${encodeURIComponent(app.id)}&purpose=programme_fee"><i class="fa-solid fa-lock"></i> Pay programme fee · ${UI.naira(app.amountPayable + charge)}</a>`
@@ -381,10 +407,11 @@ Pages["success"] = async function () {
             <div><small>Applicant</small><strong>${UI.esc(app.name)}</strong></div>
             <div><small>Programme</small><strong>${UI.esc(app.programmeName)}</strong></div>
             <div><small>Cohort</small><strong>${UI.esc(app.intake)}</strong></div>
-            <div><small>Paid for</small><strong>${isAppFee ? "Application fee" : "Programme fee"}</strong></div>
+            <div><small>Paid for</small><strong>${isAppFee ? "Application fee" : pay.installment === 1 ? "Programme fee — 1st installment" : pay.installment === 2 ? "Programme fee — balance" : "Programme fee"}</strong></div>
             <div><small>Application status</small>${UI.badge(app.status)}</div>
             <div><small>Transaction reference</small><strong class="mono" style="font-size:.82rem">${UI.esc(pay.ref)}</strong></div>
             <div><small>Amount paid</small><strong>${UI.naira(pay.amount)}</strong></div>
+            ${app.balance ? `<div><small>Balance due</small><strong>${UI.naira(app.balance)}</strong></div>` : ""}
             ${isAppFee ? "" : `<div><small>Discount</small><strong>${pay.discount ? `${Applications.discountName(app.discountType)} (−${UI.naira(pay.discount)})` : "None"}</strong></div>`}
             <div><small>Classes begin</small><strong>${UI.dateLong(start)}</strong></div>
         </div>

@@ -28,6 +28,7 @@ Register (Student account for yourself, or Parent account for your children)
 ```
 
 - **One payment (client decision, 4 Oct 2026 — the separate application fee was putting applicants off):** the programme fee (₦45,000/₦50,000) with the ₦5,000 application fee added, plus the ₦300 Zainpay charge once. Nothing is paid to apply. Discounts apply to the tuition part only, never the application fee, and don't stack (highest wins): an approved Excellence Award (50%) or the early bird (15%, judged on the payment date). E.g. ₦50,000 → ₦55,000; with the award ₦25,000 + ₦5,000 = ₦30,000.
+- **Installments (optional, 5 Oct 2026):** pay in full, or 50% of the discounted tuition plus the whole application fee to enrol (₦25,000 + ₦5,000 = ₦30,000 on a ₦50,000 programme) and the balance (₦25,000) before the programme ends; the ₦300 charge applies to each payment. The first payment fixes the price (an early bird earned then is kept) and takes the seat. Until the balance is paid, results and the certificate are withheld. Staff can switch installments off in Settings.
 - **Earlier separate application-fee payments** (1–4 Oct 2026) are credited: those applicants pay the programme fee without the ₦5,000. `manage.py apply_single_payment` moved applications still waiting on the old fee into the new flow.
 - **The Performance Scholarship no longer exists.** Qualifying applicants may skip the award and be admitted automatically.
 - **Seats** are only taken when the programme fee is paid. There's no automatic lapse of unpaid admissions (staff can reject manually).

@@ -1,4 +1,4 @@
-# Fills a fresh e2e database (see e2e/run.sh): two verified self-applicants admitted on applying, nothing paid yet.
+# Fills a fresh e2e database (see e2e/run.sh): three verified self-applicants admitted on applying, nothing paid yet.
 from datetime import date
 
 from django.core.management import call_command
@@ -13,7 +13,8 @@ call_command("seed_school")
 User.objects.create_user("rabi@tsce.edu.ng", "Staff-Pass-2026", full_name="Rabi Isa", role="staff")
 cohort = SiteSettings.load().current_cohort
 for n, (first, last, email, slug) in enumerate([("Aisha", "Garba", "aisha@example.com", "fullstack"),
-                                                ("Musa", "Bello", "musa@example.com", "network")], start=1):
+                                                ("Musa", "Bello", "musa@example.com", "network"),
+                                                ("Zara", "Idris", "zara@example.com", "fullstack")], start=1):
     user = User.objects.create_user(email, "Applicant-Pass-2026", full_name=f"{first} {last}", role="applicant",
                                     phone="0803 123 4567", email_verified_at=timezone.now())
     prog = Programme.objects.get(slug=slug)

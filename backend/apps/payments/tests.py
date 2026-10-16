@@ -142,14 +142,14 @@ class PaymentFlowTestCase(TestCase):
     def csrf(self):
         return {"HTTP_X_CSRFTOKEN": self.client.get("/api/auth/csrf").json()["csrfToken"]}
 
-    def initialize(self, purpose=APP_FEE, number="TSCE/APP/2026/00001"):
+    def initialize(self, purpose=APP_FEE, number="TSCE/APP/2026/00001", plan="full"):
         with on(OCT_1):
-            return self.client.post("/api/payments/initialize", {"applicationId": number, "purpose": purpose},
+            return self.client.post("/api/payments/initialize", {"applicationId": number, "purpose": purpose, "plan": plan},
                                     format="json", **self.csrf())
 
-    def checkout(self, outcome, purpose=APP_FEE, number="TSCE/APP/2026/00001"):
+    def checkout(self, outcome, purpose=APP_FEE, number="TSCE/APP/2026/00001", plan="full"):
         """Initialize → simulated checkout page → callback; returns (final redirect, ref)."""
-        res = self.initialize(purpose, number)
+        res = self.initialize(purpose, number, plan)
         self.assertEqual(res.status_code, 200, res.content)
         url = res.json()["checkoutUrl"]
         self.assertEqual(self.client.get(url).status_code, 200)
@@ -300,6 +300,113 @@ class SinglePaymentFlowTests(PaymentFlowTestCase):
         ref = self.initialize(PROG_FEE).json()["ref"]
         with override_settings(PAYMENT_GATEWAY="zainpay"):
             self.assertEqual(self.client.get(f"/api/payments/simulator/{ref}").status_code, 404)
+
+
+class InstallmentTests(PaymentFlowTestCase):
+    """Since 5 Oct 2026: optionally 50% of tuition + the application fee to enrol, the balance before the end."""
+
+    def setUp(self):
+        super().setUp()
+        Application.objects.filter(pk=self.app.pk).update(status="Admitted", amount_payable=55000)
+
+    def test_first_half_enrols_and_balance_clears_the_fees(self):
+        from django.core.exceptions import ValidationError
+
+        from apps.academics.models import Certificate
+
+        detail = self.client.get(f"/api/applications/{self.app.number}").json()
+        self.assertEqual(detail["firstInstallment"], 30000)  # ₦25,000 + the ₦5,000 application fee
+        _, ref = self.checkout("success", PROG_FEE, plan="half")
+        pay = Payment.objects.get(reference=ref)
+        self.assertEqual((pay.amount, pay.installment), (30000, Payment.Installment.FIRST))
+        app = self.refresh()
+        self.assertEqual((app.status, app.payment_status, app.amount_paid, app.balance), ("Enrolled", "Part Paid", 30000, 25000))
+        self.assertEqual(app.balance_due_date, app.enrollment.end_date)
+        self.assertIsNone(app.paid_at)
+        enrollment = Enrollment.objects.get()
+        self.assertFalse(enrollment.fees_cleared)
+        cert = Certificate(number="TSCE/CERT/2026/00001", enrollment=enrollment, issued_at=timezone.now())
+        with self.assertRaises(ValidationError):
+            cert.full_clean()  # withheld until the balance is paid
+        self.assertTrue(Notification.objects.filter(recipient=self.user, title="Enrolment confirmed",
+                                                    body__contains="balance of ₦25,000").exists())
+
+        res = self.initialize(PROG_FEE, plan="half")  # whatever is asked, the balance is what's due now
+        self.assertEqual((res.json()["amount"], res.json()["installment"]), (25000, Payment.Installment.BALANCE))
+        self.checkout("success", PROG_FEE)
+        app = self.refresh()
+        self.assertEqual((app.payment_status, app.amount_paid, app.balance), ("Paid", 55000, 0))
+        self.assertIsNotNone(app.paid_at)
+        enrollment.refresh_from_db()
+        self.assertEqual(enrollment.amount_paid, 55000)
+        self.assertTrue(enrollment.fees_cleared)
+        cert.full_clean()
+        self.assertEqual(Enrollment.objects.count(), 1)
+        self.assertEqual(self.initialize(PROG_FEE).json()["code"], "already_paid")
+
+    def test_zainpay_is_asked_for_the_installment_not_the_full_amount(self):
+        ok = resp(200, {"code": "00", "data": "https://checkout.zainpay.ng/x"})
+        with override_settings(PAYMENT_GATEWAY="zainpay", ZAINPAY={**ZP, "PAYER_CHARGE": 300}),                 mock.patch("apps.payments.gateways.requests.post", return_value=ok) as post:
+            res = self.initialize(PROG_FEE, plan="half")
+            self.assertEqual(res.status_code, 200, res.content)
+            self.assertEqual(post.call_args.kwargs["json"]["amount"], "30300")  # ₦30,000 + ₦300, not ₦55,300
+            self.initialize(PROG_FEE)
+            self.assertEqual(post.call_args.kwargs["json"]["amount"], "55300")
+
+    def test_early_bird_is_kept_for_the_balance(self):
+        Cohort.objects.update(early_bird_deadline=date(2026, 10, 5))
+        self.checkout("success", PROG_FEE, plan="half")
+        self.assertEqual(Payment.objects.get().amount, 26250)  # 42,500 / 2 + 5,000
+        Cohort.objects.update(early_bird_deadline=date(2026, 9, 30))  # early bird over before the balance
+        self.assertEqual(self.initialize(PROG_FEE).json()["amount"], 21250)
+
+    def test_excellence_award_half(self):
+        Application.objects.filter(pk=self.app.pk).update(status="Awaiting Verification")
+        AwardRequest.objects.create(application=self.app, type="excellence", requested_pct=50)
+        self.client.force_login(self.staff)
+        self.client.post(f"/api/staff/applications/{self.app.number}/award", {"approve": True}, format="json", **self.csrf())
+        self.client.force_login(self.user)
+        self.assertEqual(self.initialize(PROG_FEE, plan="half").json()["amount"], 17500)  # 12,500 + 5,000
+
+    def test_installments_can_be_switched_off(self):
+        SiteSettings.objects.update(allow_installments=False)
+        self.assertEqual(self.initialize(PROG_FEE, plan="half").json()["code"], "installments_off")
+        self.assertEqual(self.initialize(PROG_FEE, plan="thirds").json()["code"], "invalid")
+
+    def test_seat_is_taken_by_the_first_installment(self):
+        from apps.admissions.discounts import seats_taken
+
+        self.checkout("success", PROG_FEE, plan="half")
+        self.assertEqual(seats_taken(self.app.cohort)[self.app.programme_id], 1)
+
+    def test_half_and_full_both_paid_is_a_duplicate(self):
+        half = self.initialize(PROG_FEE, plan="half").json()
+        full = self.initialize(PROG_FEE).json()
+        for p in (half, full):
+            self.client.post(p["checkoutUrl"], {"outcome": "success"}, **self.csrf())
+            with on(OCT_1):
+                self.client.get(f"/api/payments/zainpay/callback?txnRef={p['ref']}")
+        app = self.refresh()
+        self.assertEqual((app.payment_status, app.amount_paid), ("Part Paid", 30000))
+        self.assertFalse(services.is_duplicate(Payment.objects.get(reference=half["ref"])))
+        self.assertTrue(services.is_duplicate(Payment.objects.get(reference=full["ref"])))
+        self.assertTrue(Notification.objects.filter(recipient=self.staff, title="Duplicate payment — refund needed").exists())
+
+    def test_two_balance_payments_one_is_a_duplicate(self):
+        self.checkout("success", PROG_FEE, plan="half")
+        a, b = self.initialize(PROG_FEE).json(), self.initialize(PROG_FEE).json()
+        for p in (a, b):
+            self.client.post(p["checkoutUrl"], {"outcome": "success"}, **self.csrf())
+            with on(OCT_1):
+                self.client.get(f"/api/payments/zainpay/callback?txnRef={p['ref']}")
+        self.assertEqual(self.refresh().amount_paid, 55000)
+        self.assertEqual([services.is_duplicate(Payment.objects.get(reference=p["ref"])) for p in (a, b)], [False, True])
+
+    def test_staff_reminder_for_the_balance(self):
+        self.checkout("success", PROG_FEE, plan="half")
+        self.client.force_login(self.staff)
+        res = self.client.post(f"/api/staff/applications/{self.app.number}/remind", **self.csrf())
+        self.assertEqual(res.json()["reminded"], "programme fee balance")
 
 
 class LegacyApplicationFeeTests(PaymentFlowTestCase):

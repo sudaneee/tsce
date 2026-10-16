@@ -6,6 +6,7 @@ Admissions business rules (revised flow, 1 Oct 2026):
     review_award()              staff verify the WAEC result in person → admit() at 50% or full price
     sync_programme_quote()      re-price at checkout (early bird by payment date; application fee added)
     programme_fee_paid()        → ENROLLED: Student record, student number, Enrollment, seat taken
+                                  (in full, or the 1st installment; the balance later clears the fees)
 
 Since 4 Oct 2026 there is no separate application-fee payment: the ₦5,000 is added
 to the programme fee. application_fee_paid() remains only for payments started
@@ -24,7 +25,7 @@ from apps.comms.services import notify, notify_staff
 from apps.core.exceptions import ServiceError
 from apps.core.models import Sequence, SiteSettings
 
-from .discounts import admissions_state, excellence_eligible, programme_quote, seats_taken, today
+from .discounts import admissions_state, excellence_eligible, first_installment, programme_quote, seats_taken, today
 from .models import Application, ApplicationEvent, AwardRequest
 
 MY_APPLICATIONS = "pages/my-applications.html"
@@ -192,7 +193,12 @@ def review_award(app: Application, approve: bool, staff_user, note: str = "") ->
 
 
 def sync_programme_quote(app: Application, settings: SiteSettings) -> Application:
-    """Re-price at checkout: the early bird depends on the PAYMENT date; an approved award never changes."""
+    """
+    Re-price at checkout: the early bird depends on the PAYMENT date; an approved award never changes.
+    Once a 1st installment is paid the price is fixed.
+    """
+    if app.amount_paid:
+        return app
     q = programme_quote(app, settings)
     if q.amount_payable != app.amount_payable or q.discount_type != app.discount_type:
         old = app.amount_payable
@@ -224,39 +230,81 @@ def _find_or_create_student(app: Application):
     )
 
 
+def _accepts(app: Application, payment) -> bool:
+    """Does this payment fit where the application is? (Otherwise it's a duplicate, e.g. two tabs.)"""
+    from apps.payments.models import Payment
+
+    if payment.installment == Payment.Installment.BALANCE:
+        return app.payment_status == Application.PaymentStatus.PART_PAID
+    return app.amount_paid == 0 and app.payment_status != Application.PaymentStatus.PAID
+
+
 def programme_fee_paid(app: Application, payment) -> Application:
-    """Verified programme-fee payment → enrolled. Call inside the transaction that confirmed the payment."""
+    """
+    Verified programme-fee payment. Call inside the transaction that confirmed the payment.
+    Full payment or 1st installment → ENROLLED; balance → fees cleared.
+    """
     from apps.academics.models import Enrollment
+    from apps.payments.models import Payment
 
     app = Application.objects.select_related("user", "programme", "cohort").get(pk=app.pk)
-    if app.payment_status == Application.PaymentStatus.PAID:
+    if not _accepts(app, payment):
         _flag_duplicate(app, payment, "programme fee")
         return app
+    alerts = SiteSettings.load().staff_payment_alerts
 
+    if payment.installment == Payment.Installment.BALANCE:
+        app.amount_paid += payment.amount
+        app.payment_status = Application.PaymentStatus.PAID
+        app.paid_at = payment.verified_at or timezone.now()
+        app.save(update_fields=["amount_paid", "payment_status", "paid_at", "updated_at"])
+        Enrollment.objects.filter(application=app).update(amount_paid=app.amount_paid)
+        _event(app, f"Programme fee balance of {naira(payment.amount)} paid ({payment.reference}) — fees cleared", ok=True)
+        notify(app.user, "Programme fee fully paid",
+               f"Thank you — the balance of {naira(payment.amount)} for {app.full_name} ({app.programme.name}) is paid. "
+               f"The programme fee is now fully paid. Receipt: {payment.reference}.",
+               Notification.Type.PAYMENT, link=MY_APPLICATIONS, email=True)
+        if alerts:
+            notify_staff("Programme fee balance received",
+                         f"{app.full_name} paid the {naira(payment.amount)} balance for {app.programme.name}.",
+                         Notification.Type.PAYMENT)
+        return app
+
+    first = payment.installment == Payment.Installment.FIRST
     student = _find_or_create_student(app)
     if app.user.role == User.Role.APPLICANT:
         app.user.role = User.Role.STUDENT
         app.user.save(update_fields=["role"])
 
+    end_date = app.programme.end_date_from(app.cohort.start_date)
     app.status = Application.Status.ENROLLED
-    app.payment_status = Application.PaymentStatus.PAID
-    app.paid_at = payment.verified_at or timezone.now()
-    app.save(update_fields=["status", "payment_status", "paid_at", "updated_at"])
+    app.amount_paid = payment.amount
+    if first:
+        app.payment_status = Application.PaymentStatus.PART_PAID
+        app.balance_due_date = end_date
+    else:
+        app.payment_status = Application.PaymentStatus.PAID
+        app.paid_at = payment.verified_at or timezone.now()
+    app.save(update_fields=["status", "payment_status", "paid_at", "amount_paid", "balance_due_date", "updated_at"])
     Enrollment.objects.create(
         student=student, application=app, programme=app.programme, cohort=app.cohort, schedule=app.schedule,
-        start_date=app.cohort.start_date, end_date=app.programme.end_date_from(app.cohort.start_date),
+        start_date=app.cohort.start_date, end_date=end_date,
         status=Enrollment.Status.ACTIVE, amount_paid=payment.amount,
     )
-    _event(app, f"Programme fee of {naira(payment.amount)} paid ({payment.reference})", ok=True)
+    what = "Programme fee 1st installment" if first else "Programme fee"
+    _event(app, f"{what} of {naira(payment.amount)} paid ({payment.reference})", ok=True)
     _event(app, f"Enrolled as {student.student_no}", ok=True)
 
     start = app.cohort.start_date
+    balance_note = (f" The balance of {naira(app.balance)} is due by {end_date.day} {end_date:%B %Y}; results and the "
+                    "certificate are released once it is paid." if first else "")
     notify(app.user, "Enrolment confirmed",
            f"{app.full_name} is enrolled in {app.programme.name}. Student number: {student.student_no}. "
-           f"Classes for the {app.cohort.name} begin on {start.day} {start:%B %Y}. Receipt: {payment.reference}.",
+           f"Classes for the {app.cohort.name} begin on {start.day} {start:%B %Y}. Receipt: {payment.reference}.{balance_note}",
            Notification.Type.PAYMENT, link=MY_APPLICATIONS, email=True)
-    if SiteSettings.load().staff_payment_alerts:
-        notify_staff("Programme fee received", f"{app.full_name} paid {naira(payment.amount)} for {app.programme.name}.",
+    if alerts:
+        notify_staff("Programme fee received",
+                     f"{app.full_name} paid {naira(payment.amount)}{' (1st installment)' if first else ''} for {app.programme.name}.",
                      Notification.Type.PAYMENT)
     return app
 
@@ -303,11 +351,14 @@ def send_reminder(app: Application, staff_user) -> str:
     charge = dj_settings.ZAINPAY["PAYER_CHARGE"]
     if app.status == Application.Status.ADMITTED:
         what, amount = "programme fee", app.amount_payable
+    elif app.payment_status == Application.PaymentStatus.PART_PAID:
+        what, amount = "programme fee balance", app.balance
     else:
         raise ServiceError("There is no payment due on this application.", "nothing_due")
     notify(app.user, f"Reminder: {what} due",
            f"The {what} of {naira(amount + charge)} for {app.full_name} ({app.programme.name}) is still due. "
-           "Pay it from My applications" + (" to secure the seat — places are limited." if what == "programme fee" else "."),
+           "Pay it from My applications" + (" to secure the seat — places are limited." if what == "programme fee"
+                                             else " — results and the certificate are released once it is paid."),
            Notification.Type.PAYMENT, link=MY_APPLICATIONS, email=True)
     _event(app, f"Payment reminder sent ({what})", actor=staff_user)
     return what

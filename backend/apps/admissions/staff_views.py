@@ -31,6 +31,9 @@ class StaffApplicationRowSerializer(serializers.ModelSerializer):
     paymentStatus = serializers.CharField(source="payment_status")
     applicationFeePaidAt = serializers.DateTimeField(source="application_fee_paid_at")
     amountPayable = serializers.IntegerField(source="amount_payable")
+    amountPaid = serializers.IntegerField(source="amount_paid")
+    balance = serializers.IntegerField()
+    balanceDueDate = serializers.DateField(source="balance_due_date")
     discountType = serializers.CharField(source="discount_type")
     account = serializers.SerializerMethodField()
     award = serializers.SerializerMethodField()
@@ -39,7 +42,7 @@ class StaffApplicationRowSerializer(serializers.ModelSerializer):
     class Meta:
         model = Application
         fields = ["id", "name", "email", "phone", "programmeId", "programmeName", "intake", "status", "paymentStatus",
-                  "applicationFeePaidAt", "amountPayable", "discountType", "account", "award", "createdAt"]
+                  "applicationFeePaidAt", "amountPayable", "amountPaid", "balance", "balanceDueDate", "discountType", "account", "award", "createdAt"]
 
     def get_account(self, obj):
         u = obj.user
@@ -56,7 +59,7 @@ def staff_application_detail(app):
     u = app.user
     data["account"] = {"name": u.full_name, "email": u.email, "phone": u.phone, "type": "parent" if u.role == "parent" else "self"}
     data["payments"] = [
-        {"ref": p.reference, "purpose": p.purpose, "kind": p.kind, "amount": p.amount, "status": p.status,
+        {"ref": p.reference, "purpose": p.purpose, "installment": p.installment, "kind": p.kind, "amount": p.amount, "status": p.status,
          "createdAt": p.created_at, "verifiedAt": p.verified_at}
         for p in app.payments.order_by("-created_at")
     ]

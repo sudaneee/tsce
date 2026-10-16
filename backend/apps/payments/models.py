@@ -19,6 +19,11 @@ class Payment(TimeStampedModel):
         APPLICATION_FEE = "application_fee", "Application fee"
         PROGRAMME_FEE = "programme_fee", "Programme fee"
 
+    class Installment(models.IntegerChoices):
+        FULL = 0, "Full payment"
+        FIRST = 1, "1st installment"
+        BALANCE = 2, "Balance"
+
     class Status(models.TextChoices):
         PENDING = "PENDING"
         SUCCESS = "SUCCESS"
@@ -34,6 +39,7 @@ class Payment(TimeStampedModel):
     reference = models.CharField(max_length=40, unique=True)  # TSCE-ZP-20261001-000001 (refunds end in -RF)
     kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.CHARGE)
     purpose = models.CharField(max_length=20, choices=Purpose.choices, default=Purpose.PROGRAMME_FEE, db_index=True)
+    installment = models.PositiveSmallIntegerField(choices=Installment.choices, default=Installment.FULL)
     parent = models.ForeignKey(
         "self", null=True, blank=True, on_delete=models.PROTECT, related_name="refunds",
         help_text="For refunds: the charge being refunded",

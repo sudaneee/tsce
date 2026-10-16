@@ -383,7 +383,7 @@ Pages["application"] = function () {
             ${appFee ? `<div class="fee-row"><span>Application fee</span><span>${UI.naira(appFee)}</span></div>` : ""}
             ${charge ? `<div class="fee-row"><span>Zainpay transaction charge</span><span>${UI.naira(charge)}</span></div>` : ""}
             <div class="fee-row total"><span>Total${fees.discount ? " if paid now" : ""}</span><span>${UI.naira(fees.payable + appFee + charge)}</span></div></div>
-            <p class="hint mt-1"><i class="fa-solid fa-circle-info"></i> Nothing to pay to apply. Without an award request you're admitted as soon as you submit, then pay the programme fee (it includes the ${UI.naira(appFee)} application fee) to secure the seat. Discounts apply to the programme fee only and don't stack: an approved Excellence Award (${Discounts.RULES.excellence.pct}%) replaces the early bird.</p>`;
+            <p class="hint mt-1"><i class="fa-solid fa-circle-info"></i> Nothing to pay to apply. Without an award request you're admitted as soon as you submit, then pay the programme fee (it includes the ${UI.naira(appFee)} application fee) to secure the seat${Site.settings?.payments?.allowInstallments !== false ? " — in full, or 50% now and the balance before the programme ends" : ""}. Discounts apply to the programme fee only and don't stack: an approved Excellence Award (${Discounts.RULES.excellence.pct}%) replaces the early bird.</p>`;
 
         const r = (k, v) => `<div><small>${k}</small><strong>${UI.esc(v || "—")}</strong></div>`;
         UI.$("#reviewGrid").innerHTML = r("Full name", [d.firstName, d.middleName, d.lastName].filter(Boolean).join(" ")) + r("Email", d.email) + r("Phone", d.phone) + r("Gender · DOB", `${d.gender} · ${UI.date(d.dob)}`) + r("State · LGA", `${d.state} · ${d.lga}`) + r("Qualification", `${d.qualification} — ${d.institution}`) + r("WAEC/NECO", d.waecStatus === "Available" ? `${d.waecYear} · ${d.numAs} A's${waecFile ? " · result attached" : ""}` : d.waecStatus) + r("Programme", p.name) + r("Schedule", d.schedule) + r("Intake", d.intake);
@@ -505,7 +505,8 @@ Pages["my-applications"] = async function () {
 
     const charge = Site.settings?.payments?.payerCharge || 0;
     const address = Site.settings?.institution?.address || "TSCE";
-    const pay = (a) => `<a class="btn btn-grad" href="payment.html?app=${encodeURIComponent(a.id)}&purpose=programme_fee"><i class="fa-solid fa-lock"></i> Pay programme fee · ${UI.naira(a.amountPayable + charge)}</a>`;
+    const pay = (a) => `<a class="btn btn-grad" href="payment.html?app=${encodeURIComponent(a.id)}&purpose=programme_fee"><i class="fa-solid fa-lock"></i> Pay programme fee · ${UI.naira(a.amountPayable + charge)}</a>`
+        + (a.firstInstallment && Site.settings?.payments?.allowInstallments !== false ? ` <a class="btn btn-outline" href="payment.html?app=${encodeURIComponent(a.id)}&purpose=programme_fee&plan=half">or pay 50% now · ${UI.naira(a.firstInstallment + charge)}</a>` : "");
     const STEPS = ["Applied", "Admission", "Programme fee", "Enrolled"];
     const stage = { Pending: 1, "Awaiting Verification": 1, Admitted: 2, Enrolled: 4, Rejected: 1 };
 
@@ -528,7 +529,8 @@ Pages["my-applications"] = async function () {
                     <div class="flex flex-wrap" style="align-items:center">${pay(a)}<span class="small muted">${UI.naira(a.fee)}${a.discountAmount ? ` − ${Applications.discountName(a.discountType)} ${UI.naira(a.discountAmount)}` : ""}${a.applicationFeeDue ? ` + application fee ${UI.naira(a.applicationFeeDue)}` : " · application fee already paid"}</span></div>`;
             case "Enrolled":
                 return `<div class="alert success mb-2"><i class="fa-solid fa-user-graduate"></i><p><b>Enrolled.</b> Student number <b class="mono">${UI.esc(a.studentId || "")}</b>. Classes begin ${UI.dateLong(Site.day(a.cohortStart))}.</p></div>
-                    <div class="flex flex-wrap">${a.txRef ? `<a class="btn btn-outline" href="success.html?ref=${encodeURIComponent(a.txRef)}&fresh=0"><i class="fa-solid fa-receipt"></i> Confirmation &amp; receipt</a>` : ""}${!parent ? `<a class="btn btn-primary" href="student/dashboard.html"><i class="fa-solid fa-user-graduate"></i> Student portal</a>` : ""}</div>`;
+                    ${a.paymentStatus === "Part Paid" ? `<div class="alert warning mb-2"><i class="fa-solid fa-scale-balanced"></i><p><b>Balance due: ${UI.naira(a.balance)}</b>${a.balanceDueDate ? ` by ${UI.dateLong(Site.day(a.balanceDueDate))}` : ""} (${UI.naira(a.amountPaid)} of ${UI.naira(a.amountPayable)} paid). Results and the certificate are released once it's paid.</p></div>` : ""}
+                    <div class="flex flex-wrap">${a.paymentStatus === "Part Paid" ? `<a class="btn btn-grad" href="payment.html?app=${encodeURIComponent(a.id)}&purpose=programme_fee"><i class="fa-solid fa-lock"></i> Pay balance · ${UI.naira(a.balance + charge)}</a>` : ""}${a.txRef ? `<a class="btn btn-outline" href="success.html?ref=${encodeURIComponent(a.txRef)}&fresh=0"><i class="fa-solid fa-receipt"></i> Confirmation &amp; receipt</a>` : ""}${!parent ? `<a class="btn btn-primary" href="student/dashboard.html"><i class="fa-solid fa-user-graduate"></i> Student portal</a>` : ""}</div>`;
             case "Rejected":
                 return `<div class="alert danger"><i class="fa-solid fa-circle-xmark"></i><p>This application was not successful. Contact the admissions office if you have questions.</p></div>`;
             default:

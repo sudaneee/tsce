@@ -22,15 +22,16 @@ class DiscountType(models.TextChoices):
 
 class Application(TimeStampedModel):
     class Status(models.TextChoices):
-        PENDING = "Pending"                                  # submitted, application fee not paid yet
-        AWAITING_VERIFICATION = "Awaiting Verification"      # fee paid; Excellence Award to verify in person
+        PENDING = "Pending"                                  # (earlier flow only) application fee not paid yet
+        AWAITING_VERIFICATION = "Awaiting Verification"      # Excellence Award to verify in person
         ADMITTED = "Admitted"                                # may now pay the programme fee
-        ENROLLED = "Enrolled"                                # programme fee paid
+        ENROLLED = "Enrolled"                                # programme fee paid in full, or its 1st installment
         REJECTED = "Rejected"
 
     class PaymentStatus(models.TextChoices):
         """Status of the PROGRAMME fee (the application fee has its own paid-at stamp)."""
         UNPAID = "Unpaid"
+        PART_PAID = "Part Paid"   # 1st installment paid; balance due before the programme ends
         PAID = "Paid"
         FAILED = "Failed"
         REFUNDED = "Refunded"
@@ -92,13 +93,25 @@ class Application(TimeStampedModel):
     payment_status = models.CharField(
         max_length=10, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID, db_index=True
     )
-    paid_at = models.DateTimeField(null=True, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True, help_text="When the programme fee was paid in full")
+    # Installments (5 Oct 2026): 50% of the tuition (+ the application fee) to enrol, the balance before the end.
+    amount_paid = models.PositiveIntegerField(default=0, help_text="Programme fee received so far (naira)")
+    balance_due_date = models.DateField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.number} — {self.full_name}"
+
+    @property
+    def balance(self) -> int:
+        """Programme fee still owed once paying has started (0 before the first payment and when paid up)."""
+        return max(0, self.amount_payable - self.amount_paid) if self.amount_paid else 0
+
+    @property
+    def fees_cleared(self) -> bool:
+        return self.payment_status == self.PaymentStatus.PAID
 
     @property
     def full_name(self):

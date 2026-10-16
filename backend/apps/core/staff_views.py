@@ -19,7 +19,8 @@ def settings_payload(s: SiteSettings) -> dict:
                         "directorName": s.director_name, "directorTitle": s.director_title},
         "admissions": {"intake": c.name if c else "", "cohortDate": c and c.start_date, "opens": c and c.enrolment_opens,
                        "closes": c and c.enrolment_closes, "earlyBirdDeadline": c and c.early_bird_deadline,
-                       "acceptingApplications": s.accepting_applications, "applicationFee": s.application_fee},
+                       "acceptingApplications": s.accepting_applications, "applicationFee": s.application_fee,
+                       "allowInstallments": s.allow_installments},
         "discounts": {"earlyBirdPct": s.early_bird_pct, "excellencePct": s.excellence_pct,
                       "excellenceMinYear": s.excellence_min_waec_year, "excellenceMinAs": s.excellence_min_as},
         "notifications": {"emailNotifications": s.email_notifications, "staffPaymentAlerts": s.staff_payment_alerts,
@@ -51,6 +52,7 @@ class AdmissionsSerializer(serializers.Serializer):
     earlyBirdDeadline = serializers.DateField(allow_null=True, required=False)
     acceptingApplications = serializers.BooleanField()
     applicationFee = serializers.IntegerField(min_value=0, max_value=1_000_000)
+    allowInstallments = serializers.BooleanField(required=False)
 
     def validate(self, a):
         if a.get("opens") and a.get("closes") and a["opens"] > a["closes"]:
@@ -111,6 +113,7 @@ class SettingsView(APIView):
                 c.early_bird_deadline = d.get("earlyBirdDeadline")
                 c.save()
                 s.accepting_applications, s.application_fee = d["acceptingApplications"], d["applicationFee"]
+                s.allow_installments = d.get("allowInstallments", s.allow_installments)
             elif section == "discounts":
                 s.early_bird_pct, s.excellence_pct = d["earlyBirdPct"], d["excellencePct"]
                 s.excellence_min_waec_year, s.excellence_min_as = d["excellenceMinYear"], d["excellenceMinAs"]

@@ -51,7 +51,7 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = ["ref", "kind", "purpose", "applicationId", "programmeId", "studentId", "name", "email", "description", "amount",
-                  "fee", "discount", "status", "channel", "gateway", "failureReason", "createdAt", "verifiedAt", "refundedAt"]
+                  "fee", "discount", "installment", "status", "channel", "gateway", "failureReason", "createdAt", "verifiedAt", "refundedAt"]
 
     def get_studentId(self, obj):
         # The enrolled person (a parent's child has no user of their own).
@@ -71,7 +71,7 @@ def callback_url(request):
 
 
 class InitializePaymentView(APIView):
-    """POST {applicationId, purpose: application_fee|programme_fee} → {ref, checkoutUrl, amount}."""
+    """POST {applicationId, purpose: programme_fee, plan: full|half} → {ref, checkoutUrl, amount, installment}."""
 
     permission_classes = [IsAuthenticated]
     throttle_classes = [ScopedRateThrottle]
@@ -83,10 +83,11 @@ class InitializePaymentView(APIView):
         if app is None:
             raise Http404
         purpose = str(request.data.get("purpose") or Payment.Purpose.APPLICATION_FEE)
-        payment = services.start_checkout(app, purpose, callback_url(request))
+        plan = str(request.data.get("plan") or "full")
+        payment = services.start_checkout(app, purpose, callback_url(request), plan)
         request.session[SESSION_REF] = payment.reference
         return Response({"ref": payment.reference, "purpose": payment.purpose, "checkoutUrl": payment.checkout_url,
-                         "amount": payment.amount})
+                         "amount": payment.amount, "installment": payment.installment})
 
 
 class PaymentDetailView(APIView):

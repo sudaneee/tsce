@@ -9,6 +9,10 @@ Discounts apply to the programme (tuition) part only — never the application f
   • Early Bird 15%  — programme fee paid before the cohort's early-bird deadline (automatic)
   • Excellence 50%  — WAEC/NECO from 2020 to date with 5 A's or more, verified in person by staff
 
+INSTALLMENTS (5 Oct 2026, optional): 50% of the discounted tuition plus the whole
+application fee to enrol, the balance before the programme ends. The price is
+fixed by the first payment (an early bird earned then is kept).
+
 Discounts do NOT stack: the single highest applies. (The flyer's Performance
 Scholarship was discontinued on 1 Oct 2026.) Percentages and thresholds come
 from SiteSettings, so staff can change them.
@@ -107,12 +111,20 @@ def programme_quote(app, settings: SiteSettings, on: date | None = None) -> Quot
                  discount_amount=q.discount_amount, amount_payable=q.amount_payable + app_fee, application_fee=app_fee)
 
 
+def first_installment(app) -> int:
+    """Half the (discounted) tuition, rounded up, plus any application fee still due."""
+    app_fee = max(0, app.amount_payable - (app.fee - app.discount_amount))
+    tuition = app.amount_payable - app_fee
+    return (tuition + 1) // 2 + app_fee
+
+
 def seats_taken(cohort) -> dict[int, int]:
-    """Paid, non-rejected applications per programme id for a cohort."""
+    """Paid (in full or the 1st installment), non-rejected applications per programme id for a cohort."""
     if cohort is None:
         return {}
     rows = (
-        Application.objects.filter(cohort=cohort, payment_status=Application.PaymentStatus.PAID)
+        Application.objects.filter(cohort=cohort, payment_status__in=[Application.PaymentStatus.PAID,
+                                                                      Application.PaymentStatus.PART_PAID])
         .exclude(status=Application.Status.REJECTED)
         .values("programme_id")
         .annotate(n=Count("id"))

@@ -80,6 +80,11 @@ class Enrollment(TimeStampedModel):
     def __str__(self):
         return f"{self.student.full_name} · {self.programme.code} · {self.cohort}"
 
+    @property
+    def fees_cleared(self) -> bool:
+        """Results and the certificate are withheld until the programme fee is paid in full."""
+        return self.application.fees_cleared
+
     def module_progress(self, modules=None):
         """Per-module completion derived from overall progress: [(module, pct), …]."""
         modules = list(modules if modules is not None else self.programme.modules.all())
@@ -132,7 +137,10 @@ class AttendanceRecord(models.Model):
 
 
 class Result(TimeStampedModel):
-    """An assessment score for one module."""
+    """
+    An assessment score for one module. Shown to the student only when
+    enrollment.fees_cleared (installment balance paid) — staff always see it.
+    """
 
     class Type(models.TextChoices):
         PRACTICAL = "Practical Assignment"
@@ -187,3 +195,9 @@ class Certificate(models.Model):
 
     def __str__(self):
         return self.number
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if self.enrollment_id and not self.enrollment.fees_cleared:
+            raise ValidationError("The certificate is withheld until the programme fee balance is paid in full.")

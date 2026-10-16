@@ -64,6 +64,8 @@ class SiteSettings(models.Model):
     payment_ref_prefix = models.CharField(max_length=20, default="TSCE-ZP")
     allow_card = models.BooleanField(default=True)
     allow_transfer = models.BooleanField(default=True)
+    allow_installments = models.BooleanField(
+        default=True, help_text="Let payers pay the programme fee in two halves: 50% to enrol, the balance before the programme ends")
 
     # Notifications
     email_notifications = models.BooleanField(default=True)

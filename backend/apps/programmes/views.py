@@ -42,6 +42,7 @@ def public_settings(s: SiteSettings) -> dict:
             "allowCard": s.allow_card and (not channels or any("card" in c for c in channels)),
             "allowTransfer": s.allow_transfer and (not channels or any("transfer" in c for c in channels)),
             "payerCharge": dj_settings.ZAINPAY["PAYER_CHARGE"],
+            "allowInstallments": s.allow_installments,
             "gateway": dj_settings.PAYMENT_GATEWAY,
             "environment": "simulated" if dj_settings.PAYMENT_GATEWAY == "simulator" else dj_settings.ZAINPAY["ENVIRONMENT"],
         },

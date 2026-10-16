@@ -43,7 +43,7 @@ const UI = (() => {
     /* ---------- Status badges ---------- */
     const BADGE_MAP = {
         success: ["paid", "success", "enrolled", "admitted", "accepted", "approved", "active", "published", "present", "issued", "verified", "completed", "resolved", "eligible", "applied"],
-        warning: ["pending", "awaiting verification", "under review", "late", "draft", "open", "on leave", "pending payment", "in review", "processing", "requested"],
+        warning: ["pending", "part paid", "awaiting verification", "under review", "late", "draft", "open", "on leave", "pending payment", "in review", "processing", "requested"],
         danger: ["rejected", "failed", "absent", "inactive", "suspended", "unpaid", "declined", "cancelled", "not eligible"],
         info: ["refunded", "in progress", "submitted", "scheduled"],
         neutral: ["not issued", "none", "closed", "archived", "withdrawn"]

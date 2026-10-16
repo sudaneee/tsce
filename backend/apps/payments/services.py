@@ -1,6 +1,8 @@
 """
-Payment lifecycle, independent of the gateway. Two purposes per application:
-the APPLICATION FEE (first) and the PROGRAMME FEE (after admission).
+Payment lifecycle, independent of the gateway. Since 4 Oct 2026 one purpose is
+paid: the PROGRAMME FEE (with the application fee included), either in full or —
+since 5 Oct 2026 — in two installments (1st half to enrol, then the balance).
+Old APPLICATION FEE payments from the earlier flow still complete.
 
     start_checkout()  → Payment(PENDING) + hosted checkout URL
     process_payment() → ask the gateway, then apply_result() exactly once
@@ -16,7 +18,7 @@ import logging
 from django.db import transaction
 from django.utils import timezone
 
-from apps.admissions.discounts import seats_taken, today
+from apps.admissions.discounts import first_installment, seats_taken, today
 from apps.admissions.models import Application
 from apps.admissions.services import application_fee_paid, payment_failed, programme_fee_paid, sync_programme_quote
 from apps.core.exceptions import ServiceError
@@ -33,8 +35,8 @@ def new_reference(settings: SiteSettings) -> str:
     return f"{settings.payment_ref_prefix}-{today():%Y%m%d}-{Sequence.next('tx'):06d}"
 
 
-def _checkout_terms(app: Application, purpose: str, settings: SiteSettings) -> dict:
-    """What is being paid now, or a ServiceError saying why it can't be."""
+def _checkout_terms(app: Application, purpose: str, settings: SiteSettings, plan: str = "full") -> dict:
+    """What is being paid now (plan: full | half), or a ServiceError saying why it can't be."""
     if app.status == Application.Status.REJECTED:
         raise ServiceError("This application was not successful, so it can't be paid.", "application_rejected")
     if purpose == Payment.Purpose.APPLICATION_FEE:
@@ -44,6 +46,11 @@ def _checkout_terms(app: Application, purpose: str, settings: SiteSettings) -> d
 
     if app.payment_status == Application.PaymentStatus.PAID:
         raise ServiceError("The programme fee has already been paid.", "already_paid")
+    name = f"{app.programme.name} — programme fee ({app.cohort.name})"
+    if app.payment_status == Application.PaymentStatus.PART_PAID:
+        # The balance: price fixed by the 1st installment, seat already held.
+        return {"amount": app.balance, "fee": app.fee, "discount": app.discount_amount,
+                "installment": Payment.Installment.BALANCE, "description": f"{name}, balance"}
     if app.status != Application.Status.ADMITTED:
         msg = {
             Application.Status.AWAITING_VERIFICATION: "The Excellence Award must be verified at TSCE before the programme fee can be paid.",
@@ -54,19 +61,24 @@ def _checkout_terms(app: Application, purpose: str, settings: SiteSettings) -> d
         raise ServiceError(f"Sorry — {app.programme.name} is now full for the {app.cohort.name}. "
                            "Contact admissions to change programme.", "programme_full")
     included = app.amount_payable - (app.fee - app.discount_amount)
+    incl = f" incl. ₦{included:,} application fee" if included > 0 else ""
+    if plan == "half":
+        if not settings.allow_installments:
+            raise ServiceError("Installment payments aren't available at the moment — please pay in full.", "installments_off")
+        return {"amount": first_installment(app), "fee": app.fee, "discount": app.discount_amount,
+                "installment": Payment.Installment.FIRST, "description": f"{name}, 1st installment{incl}"}
     return {"amount": app.amount_payable, "fee": app.fee, "discount": app.discount_amount,
-            "description": f"{app.programme.name} — programme fee ({app.cohort.name})"
-                           + (f" incl. ₦{included:,} application fee" if included > 0 else "")}
+            "installment": Payment.Installment.FULL, "description": name + incl}
 
 
-def start_checkout(app: Application, purpose: str, callback_url: str) -> Payment:
-    if purpose not in Payment.Purpose.values:
+def start_checkout(app: Application, purpose: str, callback_url: str, plan: str = "full") -> Payment:
+    if purpose not in Payment.Purpose.values or plan not in ("full", "half"):
         raise ServiceError("Unknown payment type.", "invalid")
     gateway = get_gateway()
     with transaction.atomic():
         settings = SiteSettings.load()
         app = Application.objects.select_related("programme", "cohort", "user", "award_request").get(pk=app.pk)
-        terms = _checkout_terms(app, purpose, settings)
+        terms = _checkout_terms(app, purpose, settings, plan)
         payment = Payment.objects.create(
             reference=new_reference(settings), kind=Payment.Kind.CHARGE, purpose=purpose, application=app,
             user=app.user, name=app.full_name, email=app.user.email, status=Payment.Status.PENDING,
@@ -145,17 +157,26 @@ def process_payment(payment: Payment) -> Payment:
 
 def counted_charge_ids(application_ids=None) -> set[int]:
     """
-    For each application and fee, the charge that actually paid it (the first
-    to succeed). Any later successful charge for the same fee is a duplicate.
+    The charges that actually paid each application's fees, replayed in the order
+    they were confirmed (the same rule programme_fee_paid() applies): a full payment
+    or 1st installment counts only when nothing is paid yet, a balance only after a
+    1st installment. Any other successful charge is a duplicate to refund.
     """
     qs = Payment.objects.filter(kind=Payment.Kind.CHARGE, application__isnull=False,
                                 status__in=[Payment.Status.SUCCESS, Payment.Status.REFUNDED])
     if application_ids is not None:
         qs = qs.filter(application_id__in=application_ids)
-    first = {}
-    for pid, app_id, purpose in qs.order_by("verified_at", "id").values_list("id", "application_id", "purpose"):
-        first.setdefault((app_id, purpose), pid)
-    return set(first.values())
+    state, counted = {}, set()
+    rows = qs.order_by("verified_at", "id").values_list("id", "application_id", "purpose", "installment")
+    for pid, app_id, purpose, installment in rows:
+        key, paid = (app_id, purpose), state.get((app_id, purpose), "none")
+        if paid == "none" and installment in (Payment.Installment.FULL, Payment.Installment.FIRST):
+            counted.add(pid)
+            state[key] = "part" if installment == Payment.Installment.FIRST else "full"
+        elif paid == "part" and installment == Payment.Installment.BALANCE:
+            counted.add(pid)
+            state[key] = "full"
+    return counted
 
 
 def is_duplicate(payment: Payment) -> bool:
