@@ -105,3 +105,17 @@ details.dropdown[open] .dropdown-menu { display: block; animation: dropIn .18s v
     .sidebar, .topbar, .bottom-nav, #actions, .actions { display: none !important; }
     .app-shell { display: block; }
 }
+
+/* ---------- Public site: pop-ups opened by a link (#p-fullstack), no JS needed ---------- */
+.link-modal { display: none; }
+.link-modal:target, .link-modal.open { display: flex; opacity: 1; }
+.link-modal:target .modal, .link-modal.open .modal { transform: none; }
+.link-modal .lm-dismiss { position: absolute; inset: 0; }
+.link-modal .modal { position: relative; z-index: 1; }
+.link-modal .modal-body { overflow-y: auto; }
+a.prog-card { color: inherit; text-decoration: none; }
+a.prog-card[hidden] { display: none; }
+.tabs a.tab { cursor: pointer; }
+/* Pop-ups live inside <main> on these pages: keep their headings as in the old (body-level) pop-ups */
+body:not(.portal) main .link-modal h2, body:not(.portal) main .link-modal h3 { text-transform: none; letter-spacing: normal; }
+a.modal-close { display: grid; place-items: center; text-decoration: none; }

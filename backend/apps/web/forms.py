@@ -302,3 +302,22 @@ class IntakeForm(StyledForm):
         if Cohort.objects.filter(name__iexact=name).exists():
             raise ValidationError("An intake with that name already exists.")
         return name
+
+
+# ---------------------------------------------------------------------------
+# Public site
+# ---------------------------------------------------------------------------
+class EnquiryForm(StyledForm):
+    name = forms.CharField(max_length=120, label="Full name", widget=forms.TextInput(attrs={"id": "c_name", "autocomplete": "name"}))
+    email = forms.EmailField(widget=forms.EmailInput(attrs={"id": "c_email", "autocomplete": "email"}))
+    phone = forms.CharField(max_length=30, widget=forms.TextInput(attrs={"id": "c_phone", "autocomplete": "tel", "placeholder": "0803 123 4567"}))
+    programme = forms.ChoiceField(required=False, label="Programme of interest", widget=forms.Select(attrs={"id": "c_prog"}))
+    subject = forms.CharField(max_length=150, required=False, widget=forms.TextInput(attrs={"id": "c_subject"}))
+    message = forms.CharField(min_length=10, widget=forms.Textarea(attrs={"id": "c_msg", "class": "textarea"}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["programme"].choices = [("", "General enquiry"), *[(p.name, p.name) for p in active_programmes()]]
+
+    def clean_phone(self):
+        return normalize_ng_phone(self.cleaned_data["phone"])

@@ -219,7 +219,10 @@ Old `pages/*.html` addresses of converted pages redirect to the new ones.
 - **Step 2 — staff portal** ✔: `/staff/` dashboard, applications (+ detail page with award decision, reminder,
   rejection, WAEC file), awards queue, payments (+ detail, Zainpay check, refund, receipt), team (admin: add, edit,
   reset password), settings (admin, incl. new intake), notifications, search; CSV exports.
-- **Step 3 — public site**: home, about, programmes, admissions, news, contact, certificate check.
+- **Step 3 — public site** ✔: home, about, programmes, admissions, news, contact and certificate check, rendered by
+  Django at the same addresses (/, /index.html, /pages/*.html) with the same design. Programmes, seats, fees,
+  discount percentages and the calendar come from the database/Settings (no hard-coded dates). `js/site.js` only
+  animates (reveal, counters, countdown, FAQ, instant catalogue filter); programme/news pop-ups open by #link.
 - **Step 4 — student portal** (Phase 7) built as templates from the start.
 - **Step 5 — clean-up**: delete the demo engine (`data.js`, `storage.js`, demo code in the JS files) and the API
   endpoints no page uses any more (the Zainpay webhook/callback stay).

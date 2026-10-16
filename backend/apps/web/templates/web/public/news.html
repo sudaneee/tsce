@@ -1,0 +1,36 @@
+{% extends "web/base.html" %}{% load web %}
+{% block title %}News &amp; Events{% endblock %}
+{% block description %}The latest announcements, admissions updates and events from TSCE.{% endblock %}
+{% block content %}
+<section class="page-hero"><div class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a><i class="fa-solid fa-chevron-right"></i><span>News &amp; Events</span></nav>
+    <span class="eyebrow">Newsroom</span><h1>News &amp; events</h1><p class="lead">The latest announcements, admissions updates and events from TSCE.</p>
+</div></section>
+<section class="section" style="padding-top:48px"><div class="container">
+    <div class="dash-grid" style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:32px">
+        <div><h2 style="font-size:1.4rem">Latest news</h2><div class="grid grid-2" id="newsGrid">
+            {% for a in items %}
+            <article class="news-card card-hover reveal"><div class="news-thumb" style="background:{{ a.gradient }}"><i class="fa-solid {{ a.icon }}" style="position:relative;z-index:1"></i></div>
+                <div class="news-body"><div class="news-meta"><span class="badge badge-primary no-dot">{{ a.tag|default:"News" }}</span><span>{{ a.published_at|default:a.created_at|shortdate }}</span></div><h3>{{ a.title }}</h3><p>{{ a.body|truncatechars:180 }}</p><a class="link-btn" href="#n-{{ a.pk }}" data-read="{{ a.pk }}">Read more <i class="fa-solid fa-arrow-right"></i></a></div></article>
+            {% empty %}
+            <div style="grid-column:1/-1"><div class="empty"><div class="empty-icon"><i class="fa-solid fa-newspaper"></i></div><h4>No news yet</h4><p>Announcements from TSCE will appear here.</p></div></div>
+            {% endfor %}
+        </div></div>
+        <aside id="events"><h2 style="font-size:1.4rem">Upcoming events</h2><div class="timeline" id="eventList">
+            {% for t in calendar %}{% if t.date >= today %}<div class="tl-item {{ t.tone }} reveal"><div class="tl-date"><b>{{ t.date.day }}</b><small>{{ t.date|date:"M" }}</small></div><div><h4>{{ t.title }}</h4><p>{{ t.text }}</p></div></div>{% endif %}{% endfor %}
+        </div>
+            {% if eb_open %}<div class="card card-pad mt-3" style="background:var(--grad-soft)"><h4>Don't miss the early bird</h4><p class="small muted">Pay before {{ cohort.early_bird_deadline|longdate }} and save {{ settings.early_bird_pct }}%.</p><a class="btn btn-primary btn-sm" href="/apply/">Apply now</a></div>
+            {% elif admissions.open %}<div class="card card-pad mt-3" style="background:var(--grad-soft)"><h4>Applications are open</h4><p class="small muted">Apply online in about 5 minutes — nothing to pay to apply.</p><a class="btn btn-primary btn-sm" href="/apply/">Apply now</a></div>{% endif %}
+        </aside>
+    </div>
+</div></section>
+<style>@media (max-width:1024px){#main .dash-grid{grid-template-columns:1fr!important}}</style>
+{% for a in items %}
+<div class="modal-backdrop link-modal" id="n-{{ a.pk }}" role="dialog" aria-modal="true" aria-labelledby="nt-{{ a.pk }}">
+    <a class="lm-dismiss" href="#close" data-close-modal aria-label="Close"></a>
+    <div class="modal"><div class="modal-head"><div><h3 id="nt-{{ a.pk }}">{{ a.title }}</h3><p>{{ a.published_at|default:a.created_at|shortdate }} · {{ a.byline }}</p></div><a class="modal-close" href="#close" data-close-modal aria-label="Close dialog"><i class="fa-solid fa-xmark"></i></a></div>
+        <div class="modal-body"><p style="white-space:pre-line">{{ a.body }}</p></div>
+        <div class="modal-foot"><a class="btn btn-primary" href="/apply/">Apply now</a></div></div>
+</div>
+{% endfor %}
+{% endblock %}

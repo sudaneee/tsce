@@ -1,0 +1,36 @@
+{% load web %}<div class="modal-backdrop link-modal{% if open %} open{% endif %}" id="p-{{ p.slug }}" role="dialog" aria-modal="true" aria-label="{{ p.name }}">
+    <a class="lm-dismiss" href="#close" data-close-modal aria-label="Close"></a>
+    <div class="modal xl">
+        <div class="modal-body" style="padding:0">
+            <div class="pd-hero"><div class="flex between" style="align-items:flex-start"><span class="badge badge-dark no-dot" style="background:rgba(255,255,255,.14)">{{ p.category }} · {{ p.track }}</span><a class="modal-close" href="#close" data-close-modal aria-label="Close" style="background:rgba(255,255,255,.12);color:#fff"><i class="fa-solid fa-xmark"></i></a></div>
+                <h2>{{ p.name }}</h2><p>{{ p.code }} · {{ p.weeks }}-week professional programme</p></div>
+            <div class="pd-facts">
+                <div><small>Duration</small><strong>{{ p.weeks }} Weeks</strong></div>
+                <div><small>Programme Fee</small><strong>{{ p.fee|naira }}</strong></div>
+                <div><small>Starts</small><strong>{{ cohort.start_date|shortdate }}</strong></div>
+                <div><small>Available Seats</small><strong>{{ p.card.available }} / {{ p.capacity }}</strong></div>
+            </div>
+            <div style="padding:24px">
+                {% if p.card.eb_price %}<div class="alert success mb-3"><i class="fa-solid fa-bolt"></i><p><b>Early-bird offer:</b> pay before {{ cohort.early_bird_deadline|date:"l" }}, {{ cohort.early_bird_deadline|longdate }} and pay <b>{{ p.card.eb_price|naira }}</b> instead of {{ p.fee|naira }} ({{ settings.early_bird_pct }}% off).</p></div>{% endif %}
+                <div class="grid grid-2" style="gap:28px">
+                    <div>
+                        <div class="pd-section"><h4><i class="fa-solid fa-bullseye"></i>Overview</h4><p>{{ p.overview }}</p></div>
+                        <div class="pd-section"><h4><i class="fa-solid fa-graduation-cap"></i>Learning outcomes</h4><ul class="checklist">{% for o in p.outcomes %}<li>{{ o }}</li>{% endfor %}</ul></div>
+                        <div class="pd-section"><h4><i class="fa-solid fa-user-check"></i>Who should apply</h4><ul class="checklist">{% for o in p.audience %}<li>{{ o }}</li>{% endfor %}</ul></div>
+                        <div class="pd-section"><h4><i class="fa-solid fa-clipboard-list"></i>Requirements</h4><ul class="checklist">{% for o in p.requirements %}<li>{{ o }}</li>{% endfor %}</ul></div>
+                    </div>
+                    <div>
+                        <div class="pd-section"><h4><i class="fa-solid fa-book-open"></i>Curriculum</h4><ol class="curriculum">{% for title, week in p.card.modules %}<li>{{ title }}<span>Wk {{ week }}</span></li>{% endfor %}</ol></div>
+                        <div class="pd-section"><h4><i class="fa-solid fa-briefcase"></i>Career opportunities</h4><div class="tag-list">{% for c in p.careers %}<span class="chip">{{ c }}</span>{% endfor %}</div></div>
+                        <div class="pd-section"><h4><i class="fa-regular fa-calendar"></i>Training schedule &amp; cohort</h4>
+                            <ul class="checklist">{% for x in p.schedules %}<li>{{ x }}</li>{% endfor %}</ul>
+                            <p class="small muted mt-2 mb-0">Intake: <b>{{ cohort.name|default:"—" }}</b> · Classes begin <b>{{ cohort.start_date|longdate }}</b></p>
+                        </div>
+                        <div class="seat-meter"><div style="flex:1"><div class="flex between small mb-1"><b>{{ p.card.enrolled }} enrolled</b><span class="muted">{{ p.card.available }} seats left</span></div><div class="progress{% if p.card.pct > 85 %} gold{% endif %}"><span data-value="{{ p.card.pct }}" style="width:{{ p.card.pct }}%"></span></div></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-foot"><a class="btn btn-ghost" href="#close" data-close-modal>Close</a><a class="btn btn-outline" href="/pages/programmes.html?id={{ p.slug }}#p-{{ p.slug }}" data-copy="/pages/programmes.html?id={{ p.slug }}#p-{{ p.slug }}"><i class="fa-solid fa-share-nodes"></i> Share</a><a class="btn btn-primary" href="/apply/?programme={{ p.slug }}">Apply for this programme <i class="fa-solid fa-arrow-right"></i></a></div>
+    </div>
+</div>

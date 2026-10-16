@@ -1,0 +1,25 @@
+{% extends "web/base.html" %}{% load web %}
+{% block title %}Programmes{% endblock %}
+{% block description %}Explore TSCE programmes: software, cybersecurity, data & AI, networking, cloud, hardware, CAD and digital marketing.{% endblock %}
+{% block content %}
+<section class="page-hero"><div class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a><i class="fa-solid fa-chevron-right"></i><span>Programmes</span></nav>
+    <span class="eyebrow">Core Technical &amp; Digital</span><h1>Explore our programmes</h1><p class="lead">{{ all_programmes|length }} intensive, practical programmes. Every programme includes hands-on labs, projects and a certificate of completion.</p>
+</div></section>
+<section class="section" style="padding-top:48px"><div class="container">
+    <form class="prog-filters" id="progFilters" method="get">
+        <div class="tabs" id="trackTabs" role="tablist" aria-label="Filter by track">{% for t in tracks %}<a class="tab{% if t == track %} active{% endif %}" data-track="{{ t }}" href="?track={{ t|urlencode }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if sort %}&sort={{ sort }}{% endif %}">{{ t }}</a>{% endfor %}</div>
+        <div class="flex flex-wrap">
+            <input type="hidden" name="track" value="{{ track }}">
+            <div class="input-icon" style="width:260px"><i class="fa-solid fa-magnifying-glass"></i><input class="input" id="progSearch" name="q" value="{{ q }}" type="search" placeholder="Search programmes or skills…" aria-label="Search programmes"></div>
+            <select class="select" id="progSort" name="sort" style="width:auto" aria-label="Sort programmes"><option value="">Recommended</option><option value="fee-asc"{% if sort == "fee-asc" %} selected{% endif %}>Fee: low to high</option><option value="fee-desc"{% if sort == "fee-desc" %} selected{% endif %}>Fee: high to low</option><option value="weeks"{% if sort == "weeks" %} selected{% endif %}>Shortest first</option></select>
+            <noscript><button class="btn btn-primary btn-sm">Apply</button></noscript>
+        </div>
+    </form>
+    <p class="small muted mb-2" id="progCount" aria-live="polite">{{ programmes|length }} programme{{ programmes|length|pluralize }}</p>
+    <div class="prog-grid" id="progGrid">{% for p in all_programmes %}{% if p in programmes %}{% include "web/public/prog_card.html" %}{% endif %}{% endfor %}</div>
+    <div id="progEmpty"{% if programmes %} hidden{% endif %}><div class="empty"><div class="empty-icon"><i class="fa-solid fa-magnifying-glass"></i></div><h4>No programmes match your search</h4><p>Try a different keyword or browse all tracks.</p><a class="btn btn-soft" id="clearProg" href="/pages/programmes.html">Clear filters</a></div></div>
+    <div class="alert mt-4"><i class="fa-solid fa-circle-info"></i><p>All fees are per programme{% if settings.application_fee %}, plus the {{ settings.application_fee|naira }} application fee{% endif %}. {% if eb_open %}Pay before {{ cohort.early_bird_deadline|longdate }} for a <b>{{ settings.early_bird_pct }}% early-bird discount</b>, or {% endif %}apply for the <b>{{ settings.excellence_pct }}% Excellence Award</b>. <a href="/pages/admissions.html#scholarships">Learn more</a></p></div>
+</div></section>
+{% for p in all_programmes %}{% if open_id == p.slug %}{% include "web/public/prog_modal.html" with open=1 %}{% else %}{% include "web/public/prog_modal.html" %}{% endif %}{% endfor %}
+{% endblock %}

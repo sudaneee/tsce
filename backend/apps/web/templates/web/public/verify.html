@@ -1,0 +1,24 @@
+{% extends "web/base.html" %}{% load web %}
+{% block title %}Verify certificate{% endblock %}
+{% block description %}Confirm the authenticity of a TSCE certificate of completion.{% endblock %}
+{% block content %}
+<section class="page-hero"><div class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a><i class="fa-solid fa-chevron-right"></i><span>Verify certificate</span></nav>
+    <span class="eyebrow">Certificate verification</span><h1>Verify a TSCE certificate</h1><p class="lead">Employers and institutions can confirm the authenticity of any TSCE certificate of completion instantly.</p>
+</div></section>
+<section class="section" style="padding-top:48px"><div class="container verify-box">
+    <div class="card card-pad">
+        <form id="verifyForm" method="get" novalidate><div class="field"><label for="verifyNo">Certificate number</label><div class="flex"><div class="input-icon" style="flex:1"><i class="fa-solid fa-certificate"></i><input id="verifyNo" name="no" class="input" value="{{ number }}" placeholder="e.g. TSCE/CERT/2026/00108" autocomplete="off" required></div><button class="btn btn-primary">Verify</button></div></div></form>
+    </div>
+    <div class="verify-result" id="verifyResult" aria-live="polite">
+    {% if result.status == "valid" %}
+        <div class="card card-pad" style="border-color:rgba(18,161,80,.35);background:linear-gradient(135deg,#F3FCF6,#fff)"><div class="flex" style="align-items:flex-start"><span class="icon-tile green" style="width:56px;height:56px;font-size:1.4rem"><i class="fa-solid fa-shield-halved"></i></span><div style="flex:1"><div class="flex between flex-wrap"><h3 class="mb-0">Certificate verified</h3><span class="badge badge-success">Valid</span></div><p class="small muted">This certificate was issued by {{ site.institution_name }}.</p>
+            <div class="kv"><div><small>Holder</small><strong>{{ result.holder }}</strong></div><div><small>Certificate No.</small><strong class="mono">{{ result.number }}</strong></div><div><small>Programme</small><strong>{{ result.programme }}</strong></div><div><small>Issued</small><strong>{{ result.issued_at|shortdate }}</strong></div><div><small>Cohort</small><strong>{{ result.cohort }}</strong></div></div></div></div></div>
+    {% elif result.status == "revoked" %}
+        <div class="alert danger"><i class="fa-solid fa-ban"></i><p>Certificate <b>{{ result.number }}</b> has been <b>revoked</b> and is no longer valid. Contact TSCE for details.</p></div>
+    {% elif result %}
+        <div class="alert danger"><i class="fa-solid fa-circle-xmark"></i><p>No certificate found with number <b>{{ result.number }}</b>. Check the number and try again, or contact TSCE.</p></div>
+    {% endif %}
+    </div>
+</div></section>
+{% endblock %}

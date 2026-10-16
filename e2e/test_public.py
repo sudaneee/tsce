@@ -32,10 +32,17 @@ with sync_playwright() as p:
 
     page.goto(f"{B}/pages/programmes.html"); page.wait_for_selector("#progGrid .prog-card")
     check("catalogue: 11 programmes", page.locator("#progGrid .prog-card").count() == 11)
-    page.click('[data-prog="fullstack"]'); page.wait_for_selector(".pd-facts")
-    facts = page.inner_text(".pd-facts")
+    page.click('[data-prog="fullstack"]'); page.wait_for_selector("#p-fullstack .pd-facts")
+    facts = page.inner_text("#p-fullstack .pd-facts")
     check("detail: seats + start date", "40 / 40" in facts and "12 Oct 2026" in facts, facts)
-    page.keyboard.press("Escape")
+    page.keyboard.press("Escape"); page.wait_for_timeout(200)
+    check("detail: Esc closes it", not page.is_visible("#p-fullstack .pd-facts"))
+
+    page.click('#trackTabs .tab[data-track="Security"]'); page.wait_for_timeout(200)
+    visible = page.locator("#progGrid .prog-card:visible").count()
+    check("catalogue: track tab filters instantly (no reload)", visible == 2 and "track=" not in page.url, str(visible) + page.url)
+    page.fill("#progSearch", "zzz"); page.wait_for_timeout(200)
+    check("catalogue: search shows the empty state", page.is_visible("#progEmpty"))
 
     page.goto(f"{B}/pages/admissions.html"); page.wait_for_selector("#feeTable tr")
     check("admissions: fee table rows", page.locator("#feeTable tr").count() == 11)
@@ -60,7 +67,7 @@ with sync_playwright() as p:
 
     page.goto(f"{B}/pages/news.html"); page.wait_for_selector("#newsGrid .news-card")
     check("news: published public announcement", "Orientation for new students" in page.inner_text("#newsGrid"))
-    page.click("[data-read]"); page.wait_for_selector(".modal >> text=main hall")
+    page.click("[data-read]"); page.wait_for_selector(".link-modal:target >> text=main hall")
     check("news: read more opens", True)
 
     page.goto(f"{B}/pages/verify.html"); page.wait_for_selector("#verifyForm")
@@ -71,6 +78,19 @@ with sync_playwright() as p:
     page.fill("#verifyNo", "TSCE/CERT/2026/12345"); page.click("#verifyForm button")
     page.wait_for_selector("#verifyResult >> text=No certificate found")
     check("verify: unknown number", True)
+    ctx.close()
+
+    # Without JavaScript the pages still show everything (they come from the server)
+    ctx = browser.new_context(java_script_enabled=False); page = ctx.new_page()
+    page.goto(f"{B}/index.html")
+    check("no JS: featured programmes present", page.locator("#featuredProgs .prog-card").count() == 6)
+    check("no JS: sections visible (no hidden reveal)", page.is_visible("#whyTitle"))
+    page.goto(f"{B}/pages/programmes.html?track=Security")
+    check("no JS: track filter by link", page.locator("#progGrid .prog-card").count() == 2)
+    page.goto(f"{B}/pages/programmes.html#p-fullstack")
+    check("no JS: programme details open by link", page.is_visible("#p-fullstack .pd-facts"))
+    page.goto(f"{B}/pages/verify.html?no=TSCE/CERT/2026/90001")
+    check("no JS: certificate check", "Certificate verified" in page.inner_text("#verifyResult"))
     ctx.close()
 
     # Staff portal renders

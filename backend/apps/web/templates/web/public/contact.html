@@ -1,0 +1,42 @@
+{% extends "web/base.html" %}{% load web %}
+{% block title %}Contact{% endblock %}
+{% block description %}Speak with the TSCE admissions team about programmes, fees, scholarships or partnerships.{% endblock %}
+{% block content %}
+<section class="page-hero"><div class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a><i class="fa-solid fa-chevron-right"></i><span>Contact</span></nav>
+    <span class="eyebrow">Get in touch</span><h1>Contact TSCE</h1><p class="lead">Speak with our admissions team about programmes, fees, scholarships or partnerships.</p>
+</div></section>
+<section class="section"><div class="container">
+    <div class="grid grid-4 mb-3">
+        <div class="contact-card reveal"><span class="icon-tile"><i class="fa-solid fa-phone"></i></span><div><h4>Call us</h4><p>{% for p in site.phones %}<a href="tel:{{ p|cut:' ' }}">{{ p }}</a>{% if not forloop.last %}<br>{% endif %}{% endfor %}</p></div></div>
+        <div class="contact-card reveal"><span class="icon-tile cyan"><i class="fa-regular fa-envelope"></i></span><div><h4>Email</h4><p>{% if site.email %}<a href="mailto:{{ site.email }}">{{ site.email }}</a>{% else %}—{% endif %}</p></div></div>
+        <div class="contact-card reveal"><span class="icon-tile gold"><i class="fa-solid fa-location-dot"></i></span><div><h4>Visit</h4><p>{{ site.address }}</p></div></div>
+        <div class="contact-card reveal"><span class="icon-tile green"><i class="fa-regular fa-clock"></i></span><div><h4>Office hours</h4><p>Mon – Fri: 8:00am – 5:00pm<br>Sat: 9:00am – 1:00pm</p></div></div>
+    </div>
+    <div class="grid grid-2" style="gap:32px;align-items:start">
+        <div class="card card-pad reveal" id="enquiry"><h2 style="font-size:1.5rem">Send an enquiry</h2><p class="muted small">We typically respond within one working day.</p>
+            {% if error %}<div class="alert danger mb-2" role="alert"><i class="fa-solid fa-circle-exclamation"></i><p>{{ error }}</p></div>{% endif %}
+            <form id="contactForm" class="form-grid mt-2" method="post" action="#enquiry" novalidate>{% csrf_token %}
+                {% include "web/partials/field.html" with f=form.name req=1 %}
+                {% include "web/partials/field.html" with f=form.email req=1 %}
+                {% include "web/partials/field.html" with f=form.phone req=1 %}
+                {% include "web/partials/field.html" with f=form.programme %}
+                {% include "web/partials/field.html" with f=form.subject cls="span-2" %}
+                {% include "web/partials/field.html" with f=form.message req=1 cls="span-2" %}
+                <div class="span-2"><button type="submit" class="btn btn-primary btn-lg">Send message <i class="fa-solid fa-paper-plane"></i></button></div>
+            </form></div>
+        <div class="reveal">
+            <div class="map-ph" role="img" aria-label="Map placeholder showing TSCE location on Sokoto Road, Zaria"><span class="road r1"></span><span class="road r2"></span><div class="map-pin"><i class="fa-solid fa-location-dot"></i><div class="lbl">TSCE · KM8 Zaria – Sokoto Road</div></div></div>
+            <div class="card card-pad mt-2"><h4>Follow TSCE</h4><div class="socials mt-2" style="--x:1">
+                {% for icon, label in socials %}<a href="#" aria-label="{{ label }}" style="background:var(--primary-50);color:var(--primary);border-color:transparent"><i class="fa-brands {{ icon }}"></i></a>{% endfor %}</div>
+                {% if site.website %}<p class="small muted mt-2 mb-0">Website: <b>{{ site.website }}</b></p>{% endif %}</div>
+        </div>
+    </div>
+</div></section>
+{% if sent %}
+<div class="modal-backdrop link-modal open" id="sent" role="dialog" aria-modal="true">
+    <a class="lm-dismiss" href="#close" data-close-modal aria-label="Close"></a>
+    <div class="modal sm"><div class="modal-body"><div class="processing"><div class="success-mark"><svg viewBox="0 0 52 52"><path d="M14 27l8 8 16-17"/></svg></div><h3>Message sent</h3><p class="muted">Thank you, {{ sent }}. Our admissions team will reply within 24 hours.</p><a class="btn btn-primary" href="#close" data-close-modal>Close</a></div></div></div>
+</div>
+{% endif %}
+{% endblock %}

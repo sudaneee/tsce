@@ -1,0 +1,10 @@
+{% load web %}<a class="prog-card reveal" href="#p-{{ p.slug }}" data-prog="{{ p.slug }}" data-track="{{ p.track }}" data-fee="{{ p.fee }}" data-weeks="{{ p.weeks }}" data-search="{{ p.card.search }}" style="--pc:{{ p.color }};--pc-bg:{{ p.color_bg }}" aria-label="View {{ p.name }} details">
+    <div class="prog-top"><span class="icon-tile"><i class="fa-solid {{ p.icon }}"></i></span><span class="badge badge-neutral no-dot prog-track">{{ p.track }}</span></div>
+    <div class="prog-body">
+        <h3>{{ p.name }}</h3>
+        <p>{{ p.overview }}</p>
+        <div class="prog-meta"><span><i class="fa-regular fa-clock"></i>{{ p.weeks }} Weeks</span><span><i class="fa-solid fa-layer-group"></i>{{ p.card.modules|length }} Modules</span>
+        <span class="seats{% if p.card.available > 8 %} ok{% endif %}"><i class="fa-solid fa-chair"></i>{{ p.card.available }} seats left</span></div>
+    </div>
+    <div class="prog-foot"><div class="prog-fee">{{ p.fee|naira }}<small>Programme fee</small></div><span class="prog-go"><i class="fa-solid fa-arrow-right"></i></span></div>
+</a>

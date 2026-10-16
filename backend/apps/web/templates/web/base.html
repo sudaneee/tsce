@@ -14,21 +14,23 @@
     <link rel="stylesheet" href="/css/main.css?v={{ asset_v }}">
     <link rel="stylesheet" href="/css/responsive.css?v={{ asset_v }}">
     <link rel="stylesheet" href="/css/web.css?v={{ asset_v }}">
+    <noscript><style>.reveal { opacity: 1; transform: none; }</style></noscript>
 </head>
 <body class="{% block body_class %}{% endblock %}">
 <a class="skip-link" href="#main">Skip to content</a>
 {% block header %}
 <div class="announce-bar" role="region" aria-label="Announcement"><div class="container">
     <span class="pill">{% if early_bird %}Early bird{% else %}Enrolling{% endif %}</span>
-    <span><strong>{{ flyer.campaign }}</strong> <span class="hide-sm">{% if cohort %}— classes start {{ cohort.start_date|longdate }}{% endif %}{% if early_bird %} · {{ site.early_bird_pct }}% off when you pay before {{ cohort.early_bird_deadline|longdate }}{% endif %}</span></span>
+    <span><strong>{{ flyer.campaign }}</strong> <span class="hide-sm">{% if cohort %}— classes start {{ cohort.start_date|date:"l" }}, {{ cohort.start_date|longdate }}{% endif %}{% if early_bird %} · {{ site.early_bird_pct }}% off when you pay before {{ cohort.early_bird_deadline|longdate }}{% endif %}</span></span>
+    {% if countdown %}<span class="countdown hide-sm"><i class="fa-regular fa-clock"></i> <span id="abCount" data-start="{{ cohort.start_date|date:'Y-m-d' }}">{{ countdown }}</span></span>{% endif %}
     <a href="/apply/">Apply now →</a>
 </div></div>
 <header class="site-header" id="siteHeader"><div class="container nav">
     {% include "web/partials/brand.html" %}
-    <nav aria-label="Main navigation"><ul class="nav-links">{% for href, text, icon in nav %}<li><a href="{{ href }}">{{ text }}</a></li>{% endfor %}</ul></nav>
+    <nav aria-label="Main navigation"><ul class="nav-links">{% for href, text, icon, key in nav %}<li><a href="{{ href }}"{% if key and key == active_nav %} class="active" aria-current="page"{% endif %}>{{ text }}</a></li>{% endfor %}</ul></nav>
     <div class="nav-actions">
         <details class="nav-drop" id="portalDrop">
-            <summary class="btn btn-ghost btn-sm nav-drop-btn"><i class="fa-regular fa-circle-user"></i> <span class="hide-sm">{% if user.is_authenticated %}My account{% else %}Portal{% endif %}</span> <i class="fa-solid fa-chevron-down" style="font-size:.7rem"></i></summary>
+            <summary class="btn btn-ghost btn-sm nav-drop-btn"><i class="fa-regular fa-circle-user"></i> <span class="hide-sm">{% if user.is_authenticated %}My account{% else %}Portals{% endif %}</span> <i class="fa-solid fa-chevron-down" style="font-size:.7rem"></i></summary>
             <ul class="nav-drop-menu">
                 {% if user.is_authenticated %}
                 <li><a href="{{ home_url }}"><span class="icon-tile green"><i class="fa-solid fa-arrow-right-to-bracket"></i></span><span>Continue as {{ first_name }}<small>{{ user.email }}</small></span></a></li>
@@ -46,7 +48,7 @@
 </div></header>
 <div class="mobile-nav" id="mobileNav"><a class="mn-backdrop" href="#" aria-label="Close menu"></a><div class="mn-panel" role="dialog" aria-label="Menu">
     <div class="mn-head">{% include "web/partials/brand.html" %}<a class="modal-close" href="#" aria-label="Close menu"><i class="fa-solid fa-xmark"></i></a></div>
-    <ul class="mn-links">{% for href, text, icon in nav %}<li><a href="{{ href }}"><i class="fa-solid {{ icon }}"></i>{{ text }}</a></li>{% endfor %}
+    <ul class="mn-links">{% for href, text, icon, key in nav %}<li><a href="{{ href }}"{% if key and key == active_nav %} class="active"{% endif %}><i class="fa-solid {{ icon }}"></i>{{ text }}</a></li>{% endfor %}
         {% if user.is_authenticated %}<li><a href="{{ home_url }}"><i class="fa-solid fa-user-graduate"></i>My account</a></li>
         {% else %}<li><a href="{% url 'web:login' %}"><i class="fa-solid fa-user-graduate"></i>Student Portal</a></li><li><a href="{% url 'web:login' %}?role=staff"><i class="fa-solid fa-briefcase"></i>Staff Portal</a></li>{% endif %}</ul>
     <a class="btn btn-primary btn-lg btn-block" href="/apply/">Apply Now</a>
@@ -73,5 +75,6 @@
     <div class="footer-bottom"><span>© {% now "Y" %} {{ site.institution_name }}. All rights reserved.</span><span class="motto">{% for m in flyer.motto %}{{ m }}{% if not forloop.last %}<span>|</span>{% endif %}{% endfor %}</span></div>
 </div></footer>
 {% endblock %}
+<script src="/js/site.js?v={{ asset_v }}" defer></script>
 </body>
 </html>

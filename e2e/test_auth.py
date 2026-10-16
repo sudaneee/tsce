@@ -32,7 +32,7 @@ with sync_playwright() as p:
     # 1. Public home: signed out, no demo chrome
     page.goto(f"{B}/index.html"); page.wait_for_selector("#siteHeader")
     check("no demo chip / explore button", page.locator(".demo-chip, .explore-fab").count() == 0)
-    check("portal menu says Portals when signed out", "Portals" in page.inner_text("#portalDrop button"))
+    check("portal menu says Portals when signed out", "Portals" in page.inner_text("#portalDrop summary"))
 
     # 2. Login page: demo panel gone; wrong password shows the server message
     page.goto(f"{B}/pages/login.html"); page.wait_for_url("**/account/login/"); page.wait_for_selector("#loginForm")

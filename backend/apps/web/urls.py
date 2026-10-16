@@ -1,10 +1,20 @@
 from django.urls import path, re_path
 
-from .views import applicant, apply, auth, staff
+from .views import applicant, apply, auth, public, staff
 
 app_name = "web"
 
 urlpatterns = [
+    # The public website, at its usual addresses
+    path("", public.home, name="home"),
+    path("index.html", public.home),
+    path("pages/about.html", public.about, name="about"),
+    path("pages/programmes.html", public.programmes, name="programmes"),
+    path("pages/admissions.html", public.admissions, name="admissions"),
+    path("pages/news.html", public.news, name="news"),
+    path("pages/contact.html", public.contact, name="contact"),
+    path("pages/verify.html", public.verify, name="verify"),
+
     path("account/login/", auth.login_view, name="login"),
     path("account/register/", auth.register_view, name="register"),
     path("account/verify-email/", auth.verify_email_view, name="verify-email"),
