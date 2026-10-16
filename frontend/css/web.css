@@ -73,3 +73,35 @@ a.mn-backdrop { display: block; }
 .list-item .grow { flex: 1; min-width: 0; }
 .list-item strong { display: block; font-size: .9rem; color: var(--text); }
 .list-item small { color: var(--muted); font-size: .8rem; }
+
+/* ---------- Staff portal (server-rendered shell) ---------- */
+.avatar.sm { width: 32px; height: 32px; font-size: .72rem; }
+.staff-portal .avatar { background: var(--grad-brand); color: #fff; }
+details.dropdown > summary { list-style: none; cursor: pointer; }
+details.dropdown > summary::-webkit-details-marker { display: none; }
+details.dropdown[open] .dropdown-menu { display: block; animation: dropIn .18s var(--ease); }
+.dropdown-menu form { margin: 0; }
+.menu-list form button { width: 100%; }
+.dm-list form button.notif { width: 100%; border: 0; background: none; text-align: left; font: inherit; color: inherit; }
+.dm-list .notif p { margin: 2px 0; font-size: .8rem; color: var(--muted); }
+.dm-list .notif small { color: var(--muted-2); font-size: .72rem; }
+.sb-soon { opacity: .45; cursor: default; }
+.sb-soon .sb-count { background: transparent; color: inherit; font-weight: 600; }
+.sb-close, .sb-backdrop { display: none; }
+.sb-user form { margin: 0 0 0 auto; }
+.tb-search { margin: 0; }
+.table-tools { flex-wrap: wrap; }
+.pager a { display: inline-grid; place-items: center; min-width: 34px; height: 34px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--border); color: var(--text-2); font-size: .82rem; font-weight: 600; text-decoration: none; }
+.pager a.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.stat-chip { text-decoration: none; }
+.tabs a.tab { text-decoration: none; }
+.history { list-style: none; padding: 0; margin: 0; }
+@media (max-width: 1024px) {
+    .sidebar:target { transform: none; z-index: 130; }
+    .sidebar:target ~ .sb-backdrop { display: block; position: fixed; inset: 0; background: rgba(9, 18, 48, .45); z-index: 125; }
+    .sidebar:target .sb-close { display: grid; place-items: center; margin-left: auto; color: #fff; }
+}
+@media print {
+    .sidebar, .topbar, .bottom-nav, #actions, .actions { display: none !important; }
+    .app-shell { display: block; }
+}

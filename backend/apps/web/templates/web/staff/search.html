@@ -1,0 +1,16 @@
+{% extends "web/staff/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Search{% if q %}: “{{ q }}”{% endif %}</h2><p>Applications, students and payments.</p></div></div>
+{% if q|length < 2 %}<div class="panel"><div class="empty"><div class="empty-icon"><i class="fa-solid fa-magnifying-glass"></i></div><h4>Type at least 2 characters</h4><p>Use the search box at the top.</p></div></div>
+{% elif not apps and not students and not pays %}<div class="panel"><div class="empty"><div class="empty-icon"><i class="fa-solid fa-magnifying-glass"></i></div><h4>No results for “{{ q }}”</h4></div></div>
+{% else %}
+<div class="dash-grid cols-12" id="searchResults">
+    <div class="panel span-6"><div class="panel-head"><h3><i class="fa-solid fa-file-signature"></i>Applications ({{ apps|length }})</h3></div>
+        <ul class="list">{% for a in apps %}<li><a class="list-item" style="color:inherit;padding:12px 18px" href="{% url 'web:staff-application' a.number %}"><span class="avatar sm">{{ a.full_name|initials }}</span><div class="grow"><strong>{{ a.full_name }}</strong><small>{{ a.number }} · {{ a.programme.name }}</small></div><span class="badge badge-{{ a.status|badge_tone }}">{{ a.status }}</span></a></li>{% empty %}<li class="list-item small muted" style="padding:12px 18px">None</li>{% endfor %}</ul></div>
+    <div class="panel span-6"><div class="panel-head"><h3><i class="fa-solid fa-naira-sign"></i>Payments ({{ pays|length }})</h3></div>
+        <ul class="list">{% for p in pays %}<li><a class="list-item" style="color:inherit;padding:12px 18px" href="{% url 'web:staff-payment' p.reference %}"><div class="grow"><strong class="mono">{{ p.reference }}</strong><small>{{ p.name }} · {{ p.amount|naira }}</small></div><span class="badge badge-{{ p.status|badge_tone }}">{{ p.status }}</span></a></li>{% empty %}<li class="list-item small muted" style="padding:12px 18px">None</li>{% endfor %}</ul></div>
+    <div class="panel span-6"><div class="panel-head"><h3><i class="fa-solid fa-user-graduate"></i>Students ({{ students|length }})</h3></div>
+        <ul class="list">{% for s in students %}{% with e=s.enrollments.all|first %}<li>{% if e %}<a class="list-item" style="color:inherit;padding:12px 18px" href="{% url 'web:staff-application' e.application.number %}">{% else %}<div class="list-item" style="padding:12px 18px">{% endif %}<span class="avatar sm">{{ s.full_name|initials }}</span><div class="grow"><strong>{{ s.full_name }}</strong><small class="mono">{{ s.student_no }}</small></div>{% if e %}</a>{% else %}</div>{% endif %}</li>{% endwith %}{% empty %}<li class="list-item small muted" style="padding:12px 18px">None</li>{% endfor %}</ul></div>
+</div>
+{% endif %}
+{% endblock %}

@@ -41,7 +41,7 @@ def asset_version() -> str:
 def home_for(user) -> str:
     """Where a signed-in account belongs."""
     if user.role in ("staff", "admin"):
-        return "/pages/staff/dashboard.html"
+        return "/staff/"
     return "/my-applications/"
 
 

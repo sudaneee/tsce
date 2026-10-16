@@ -1,0 +1,13 @@
+{% extends "web/staff/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Notifications</h2><p>New applications, payments, award visits and duplicates to refund.</p></div>
+    <div class="actions"><form method="post">{% csrf_token %}<button class="btn btn-outline"><i class="fa-solid fa-check-double"></i> Mark all read</button></form></div></div>
+<div class="panel">
+{% if page.object_list %}
+    <div>{% for n in page.object_list %}
+        <form method="post" action="{% url 'web:staff-notification' n.pk %}">{% csrf_token %}<button class="notif{% if not n.read %} unread{% endif %}" style="width:100%;border:0;background:none;text-align:left;font:inherit"><span class="icon-tile"><i class="fa-solid fa-bell"></i></span><div><strong class="n-title">{{ n.title }}</strong><p class="mb-0 small">{{ n.body }}</p><small class="muted">{{ n.created_at|datetime_short }}</small></div></button></form>
+    {% endfor %}</div>
+    {% include "web/staff/pager.html" %}
+{% else %}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-bell-slash"></i></div><h4>No notifications</h4></div>{% endif %}
+</div>
+{% endblock %}

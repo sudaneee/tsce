@@ -1,0 +1,24 @@
+{% extends "web/staff/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Excellence Awards</h2><p>Applicants who requested the {{ s.excellence_pct }}% award bring their original result to TSCE. Verify it on the application — either decision admits them.</p></div></div>
+<div class="alert mb-3"><i class="fa-solid fa-circle-info"></i><p><b>How to verify:</b> check the original certificate or scratch-card result against WAEC/NECO {{ s.excellence_min_waec_year }}–date with {{ s.excellence_min_as }}+ A's, then approve ({{ s.excellence_pct }}% off the programme fee) or decline (normal fee).</p></div>
+<div class="panel"><div class="panel-head">
+    <div class="tabs" id="awTabs" role="tablist">{% for t, label, n in tabs %}<a class="tab{% if t == tab %} active{% endif %}" href="?tab={{ t }}&q={{ q|urlencode }}" role="tab">{{ label }} ({{ n }})</a>{% endfor %}</div>
+    <form method="get" class="input-icon" style="width:260px;max-width:100%"><input type="hidden" name="tab" value="{{ tab }}"><i class="fa-solid fa-magnifying-glass"></i><input class="input" id="awSearch" name="q" value="{{ q }}" placeholder="Search…" aria-label="Search awards" style="height:40px"></form>
+</div>
+<div id="awTable">
+{% if rows %}
+<div class="table-wrap"><table class="table">
+    <thead><tr><th>Applicant</th><th>Programme</th><th>Declared result</th><th>Contact</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for a in rows %}<tr>
+        <td><div class="person"><span class="avatar sm">{{ a.full_name|initials }}</span><div><strong><a href="{% url 'web:staff-application' a.number %}">{{ a.full_name }}</a></strong><small>{{ a.number }}</small></div></div></td>
+        <td><span class="small">{{ a.programme.name }}</span></td>
+        <td><span class="small">{{ a.award_request.evidence }}</span></td>
+        <td><span class="small">{{ a.user.full_name }}<br><a href="tel:{{ a.user.phone|default:a.phone|cut:' ' }}">{{ a.user.phone|default:a.phone }}</a></span></td>
+        <td>{% if a.award_request.status == "Pending" %}<span class="badge badge-{{ a.status|badge_tone }}">{{ a.status }}</span>{% else %}<span class="badge badge-{{ a.award_request.status|badge_tone }}">{{ a.award_request.status }}</span>{% endif %}</td>
+        <td>{% if a.status == "Awaiting Verification" %}<a class="btn btn-xs btn-primary" href="{% url 'web:staff-application' a.number %}#actions">Verify</a>{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+</table></div>
+{% else %}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-award"></i></div><h4>Nothing here</h4><p>{% if tab == "Pending" %}No awards are waiting for verification.{% else %}No awards in this list.{% endif %}</p></div>{% endif %}
+</div></div>
+{% endblock %}

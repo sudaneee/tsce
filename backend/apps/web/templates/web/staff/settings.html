@@ -1,0 +1,75 @@
+{% extends "web/staff/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Settings</h2><p>Institution profile, admissions calendar, fees, discounts and notifications.</p></div></div>
+<div class="settings-layout">
+    <nav class="panel settings-nav" aria-label="Settings sections">
+        <a href="#institution"><i class="fa-solid fa-building-columns"></i>Institution</a><a href="#admissions"><i class="fa-solid fa-door-open"></i>Admissions</a>
+        <a href="#intake"><i class="fa-solid fa-plus"></i>New intake</a><a href="#discounts"><i class="fa-solid fa-percent"></i>Discounts</a>
+        <a href="#notifications"><i class="fa-solid fa-bell"></i>Notifications</a><a href="#pay"><i class="fa-solid fa-credit-card"></i>Payments &amp; email</a>
+    </nav>
+    <div style="display:grid;gap:20px">
+        {% with f=forms.institution %}
+        <form class="panel" id="institution" method="post" novalidate>{% csrf_token %}<input type="hidden" name="section" value="institution">
+            <div class="panel-head"><div><h3><i class="fa-solid fa-building-columns"></i>Institution</h3><p>Shown on receipts, certificates and the website</p></div></div>
+            <div class="panel-body"><div class="form-grid">
+                {% include "web/partials/field.html" with f=f.name cls="span-2" %}{% include "web/partials/field.html" with f=f.short %}{% include "web/partials/field.html" with f=f.city %}
+                {% include "web/partials/field.html" with f=f.address cls="span-2" %}{% include "web/partials/field.html" with f=f.phones cls="span-2" %}
+                {% include "web/partials/field.html" with f=f.email %}{% include "web/partials/field.html" with f=f.website %}
+                {% include "web/partials/field.html" with f=f.directorName %}{% include "web/partials/field.html" with f=f.directorTitle %}
+            </div></div><div class="table-foot"><span></span><button class="btn btn-primary">Save</button></div></form>
+        {% endwith %}
+
+        {% with f=forms.admissions %}
+        <form class="panel" id="admissions" method="post" novalidate>{% csrf_token %}<input type="hidden" name="section" value="admissions">
+            <div class="panel-head"><div><h3><i class="fa-solid fa-door-open"></i>Admissions</h3><p>Current intake, application window and the application fee added to every programme fee</p></div></div>
+            <div class="panel-body"><div class="form-grid">
+                {% include "web/partials/field.html" with f=f.intake cls="span-2" %}
+                {% include "web/partials/field.html" with f=f.opens %}{% include "web/partials/field.html" with f=f.closes %}
+                {% include "web/partials/field.html" with f=f.cohortDate %}{% include "web/partials/field.html" with f=f.earlyBirdDeadline %}
+                {% include "web/partials/field.html" with f=f.applicationFee %}<div></div>
+                <div class="span-2 setting-row"><div><strong>Accept new applications</strong><small>Turn off to close the application form immediately</small></div><label class="switch">{{ f.acceptingApplications }}<span></span></label></div>
+                <div class="span-2 setting-row"><div><strong>Allow installment payments</strong><small>50% of the programme fee (+ application fee) to enrol, the balance before the programme ends</small></div><label class="switch">{{ f.allowInstallments }}<span></span></label></div>
+            </div></div><div class="table-foot"><span class="small muted">Changes apply to new applications and payments from now on.</span><button class="btn btn-primary">Save</button></div></form>
+        {% endwith %}
+
+        {% with f=forms.intake %}
+        <form class="panel" id="intake" method="post" novalidate>{% csrf_token %}<input type="hidden" name="section" value="intake">
+            <div class="panel-head"><div><h3><i class="fa-solid fa-plus"></i>Start a new intake</h3><p>New applications go to the new intake. Existing applications keep theirs.</p></div></div>
+            <div class="panel-body"><div class="form-grid">
+                {% include "web/partials/field.html" with f=f.intake req=1 cls="span-2" %}
+                {% include "web/partials/field.html" with f=f.opens %}{% include "web/partials/field.html" with f=f.closes %}
+                {% include "web/partials/field.html" with f=f.cohortDate req=1 %}{% include "web/partials/field.html" with f=f.earlyBirdDeadline %}
+            </div></div><div class="table-foot"><span></span><button class="btn btn-outline">Start intake</button></div></form>
+        {% endwith %}
+
+        {% with f=forms.discounts %}
+        <form class="panel" id="discounts" method="post" novalidate>{% csrf_token %}<input type="hidden" name="section" value="discounts">
+            <div class="panel-head"><div><h3><i class="fa-solid fa-percent"></i>Discounts</h3><p>Programme-fee discounts — they don't stack; the better one applies</p></div></div>
+            <div class="panel-body"><div class="form-grid">
+                {% include "web/partials/field.html" with f=f.earlyBirdPct %}{% include "web/partials/field.html" with f=f.excellencePct %}
+                {% include "web/partials/field.html" with f=f.excellenceMinYear %}{% include "web/partials/field.html" with f=f.excellenceMinAs %}
+            </div></div><div class="table-foot"><span></span><button class="btn btn-primary">Save</button></div></form>
+        {% endwith %}
+
+        {% with f=forms.notifications %}
+        <form class="panel" id="notifications" method="post" novalidate>{% csrf_token %}<input type="hidden" name="section" value="notifications">
+            <div class="panel-head"><div><h3><i class="fa-solid fa-bell"></i>Notifications</h3></div></div>
+            <div class="panel-body">
+                <div class="setting-row"><div><strong>Email applicants and parents</strong><small>Admission, payment and award updates (also shown in the portal)</small></div><label class="switch">{{ f.emailNotifications }}<span></span></label></div>
+                <div class="setting-row"><div><strong>Staff payment alerts</strong><small>Notify staff of every programme-fee payment</small></div><label class="switch">{{ f.staffPaymentAlerts }}<span></span></label></div>
+                <div class="setting-row"><div><strong>Staff application alerts</strong><small>Notify staff of every new application</small></div><label class="switch">{{ f.staffApplicationAlerts }}<span></span></label></div>
+            </div><div class="table-foot"><span></span><button class="btn btn-primary">Save</button></div></form>
+        {% endwith %}
+
+        <div class="panel" id="pay"><div class="panel-head"><div><h3><i class="fa-solid fa-credit-card"></i>Payments &amp; email</h3><p>Configured on the server (backend/.env) — shown here for reference</p></div>
+            <span class="badge {% if gateway.name == 'zainpay' and gateway.environment == 'live' %}badge-success{% else %}badge-warning{% endif %}">{% if gateway.name == "simulator" %}Simulator{% else %}Zainpay · {{ gateway.environment }}{% endif %}</span></div>
+            <div class="panel-body"><div class="kv">
+                <div><small>Gateway</small><strong>{% if gateway.name == "simulator" %}Built-in simulator (no real money){% else %}Zainpay{% endif %}</strong></div>
+                <div><small>Payment channels</small><strong>{{ gateway.channels|default:"All channels" }}</strong></div>
+                <div><small>Transaction charge (paid by payer)</small><strong>{{ gateway.payer_charge|naira }}</strong></div>
+                <div><small>Reference prefix</small><strong class="mono">{{ gateway.prefix }}</strong></div>
+                <div class="full"><small>Outgoing email</small><strong>{% if gateway.email %}Configured (Gmail SMTP){% else %}<span style="color:var(--danger)">Not configured — emails are not being sent</span>{% endif %}</strong></div>
+            </div></div></div>
+    </div>
+</div>
+{% endblock %}

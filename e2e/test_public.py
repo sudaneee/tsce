@@ -73,10 +73,10 @@ with sync_playwright() as p:
     check("verify: unknown number", True)
     ctx.close()
 
-    # Staff portal still renders with the catalogue from the API
+    # Staff portal renders
     ctx = browser.new_context(); page = ctx.new_page(); watch(page)
     page.goto(f"{B}/pages/login.html"); page.fill("#loginEmail", "rabi@tsce.edu.ng"); page.fill("#loginPassword", "Staff-Pass-2026")
-    page.click("#loginForm button[type=submit]"); page.wait_for_url("**/staff/dashboard.html"); page.wait_for_timeout(800)
+    page.click("#loginForm button[type=submit]"); page.wait_for_url("**/staff/")
     check("staff dashboard renders", page.locator("#view .kpi, #view .panel").count() > 0)
     browser.close()
 

@@ -118,12 +118,13 @@ with sync_playwright() as p:
     page.goto(f"{B}/pay/{umar_no}/"); page.wait_for_selector("#payRoot .empty")
     check("programme fee blocked until verified", "verification pending" in page.inner_text("#payRoot"))
 
-    # Staff verify the WAEC result in person and approve (staff screens come in Phase 5)
+    # Staff verify the WAEC result in person and approve on the application page
     staff_ctx = browser.new_context(); staff = staff_ctx.new_page(); watch(staff)
     staff.goto(f"{B}/account/login/?role=staff"); staff.fill("#loginEmail", "rabi@tsce.edu.ng"); staff.fill("#loginPassword", "Staff-Pass-2026")
-    staff.click("#loginForm button[type=submit]"); staff.wait_for_url("**/staff/dashboard.html")
-    res = staff.evaluate(f"API.post('staff/applications/' + encodeURIComponent('{umar_no}') + '/award', {{approve: true, note: 'Original WAEC seen'}})")
-    check("staff approve award → admitted at 50% of tuition + ₦5,000", res["status"] == "Admitted" and res["amountPayable"] == 30000, str(res)[:200])
+    staff.click("#loginForm button[type=submit]"); staff.wait_for_url("**/staff/")
+    staff.goto(f"{B}/staff/applications/{umar_no}/"); staff.wait_for_selector('button[value="award-yes"]')
+    staff.fill("#id_note", "Original WAEC seen"); staff.click('button[value="award-yes"]'); staff.wait_for_selector(".toast-msg")
+    check("staff approve award → admitted at 50% of tuition + ₦5,000", "₦30,000" in staff.inner_text(".toast-msg"), staff.inner_text(".toast-msg"))
     staff_ctx.close()
 
     page.goto(f"{B}/my-applications/"); page.wait_for_selector("#maRoot article")

@@ -86,7 +86,7 @@ class AccountPagesTests(WebTestCase):
     def test_staff_login_goes_to_staff_portal(self):
         User.objects.create_user("rabi@tsce.edu.ng", PW, full_name="Rabi", role="staff", email_verified_at=timezone.now())
         res = self.client.post("/account/login/?role=staff", {"email": "rabi@tsce.edu.ng", "password": PW})
-        self.assertEqual(res["Location"], "/pages/staff/dashboard.html")
+        self.assertEqual(res["Location"], "/staff/")
 
     def test_login_is_rate_limited(self):
         for _ in range(10):

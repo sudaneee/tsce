@@ -1,0 +1,28 @@
+{% extends "web/staff/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Staff</h2><p>Staff records and portal access. Instructors can be listed without a login.</p></div>
+    <div class="actions"><a class="btn btn-primary" id="addStaff" href="{% url 'web:staff-team-new' %}"><i class="fa-solid fa-user-plus"></i> Add staff</a></div></div>
+<div class="panel">
+    <form class="table-tools" method="get">
+        <div class="input-icon"><i class="fa-solid fa-magnifying-glass"></i><input class="input" id="sfQ" name="q" value="{{ q }}" placeholder="Search staff…" aria-label="Search staff"></div>
+        <select class="select" id="sfD" name="dept" aria-label="Department"><option value="">All departments</option>{% for d in departments %}<option{% if d == dept %} selected{% endif %}>{{ d }}</option>{% endfor %}</select>
+        <button class="btn btn-primary btn-sm" type="submit">Filter</button>
+    </form>
+    <div id="sfT">
+    {% if rows %}
+    <div class="table-wrap"><table class="table">
+        <thead><tr><th>Name</th><th>No.</th><th>Role</th><th>Department</th><th>Portal access</th><th>Status</th><th>Last sign-in</th></tr></thead>
+        <tbody>{% for r in rows %}{% with s=r.s %}<tr>
+            <td><div class="person"><span class="avatar sm">{{ s.full_name|initials }}</span><div><strong><a href="{% url 'web:staff-team-member' s.pk %}">{{ s.full_name }}</a></strong><small>{{ s.email|default:"no email" }}</small></div></div></td>
+            <td><span class="ref">{{ s.staff_no }}</span></td>
+            <td>{{ s.title }}</td>
+            <td><span class="badge badge-neutral no-dot">{{ s.department }}</span></td>
+            <td>{% if r.access == "none" %}<span class="muted small">No login</span>{% else %}<span class="badge {% if r.access == 'admin' %}badge-dark{% else %}badge-primary{% endif %} no-dot">{{ r.access }}</span>{% endif %}</td>
+            <td><span class="badge badge-{{ s.status|badge_tone }}">{{ s.status }}</span></td>
+            <td><span class="small">{% if s.user.last_login %}{{ s.user.last_login|timesince }} ago{% else %}—{% endif %}</span></td>
+        </tr>{% endwith %}{% endfor %}</tbody>
+    </table></div>
+    {% else %}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-id-badge"></i></div><h4>No staff found</h4></div>{% endif %}
+    </div>
+</div>
+{% endblock %}

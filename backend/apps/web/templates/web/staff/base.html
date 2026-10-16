@@ -1,0 +1,85 @@
+{% load web %}<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Staff · {{ page_title }} — TSCE</title>
+    <meta name="theme-color" content="#0B1D55">
+    <link rel="icon" href="/assets/logo/favicon.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="/css/main.css?v={{ asset_v }}">
+    <link rel="stylesheet" href="/css/dashboard.css?v={{ asset_v }}">
+    <link rel="stylesheet" href="/css/responsive.css?v={{ asset_v }}">
+    <link rel="stylesheet" href="/css/web.css?v={{ asset_v }}">
+</head>
+<body class="staff-portal">
+<a class="skip-link" href="#view">Skip to content</a>
+<div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Sidebar">
+        <div class="sb-head">{% include "web/partials/brand.html" %}<a class="sb-close" href="#" aria-label="Close menu"><i class="fa-solid fa-xmark"></i></a></div>
+        <div class="sb-portal"><span class="dot"></span><div class="txt"><b>{% if is_admin %}Admin Console{% else %}Staff Portal{% endif %}</b>TSCE · Zaria</div></div>
+        <nav class="sb-nav" aria-label="Portal navigation">
+            <div class="sb-label">Overview</div>
+            <a class="sb-link{% if active == 'dashboard' %} active{% endif %}" href="{% url 'web:staff-dashboard' %}"><i class="fa-solid fa-gauge-high"></i><span>Dashboard</span></a>
+            <div class="sb-label">Admissions</div>
+            <a class="sb-link{% if active == 'applications' %} active{% endif %}" href="{% url 'web:staff-applications' %}"><i class="fa-solid fa-file-signature"></i><span>Applications</span></a>
+            <a class="sb-link{% if active == 'awards' %} active{% endif %}" href="{% url 'web:staff-awards' %}"><i class="fa-solid fa-award"></i><span>Excellence Awards</span>{% if counts.awards %}<b class="sb-count" data-count-for="staff-scholarships">{{ counts.awards }}</b>{% endif %}</a>
+            <a class="sb-link{% if active == 'payments' %} active{% endif %}" href="{% url 'web:staff-payments' %}"><i class="fa-solid fa-naira-sign"></i><span>Payments</span>{% if counts.duplicates %}<b class="sb-count" data-count-for="staff-payments">{{ counts.duplicates }}</b>{% endif %}</a>
+            <div class="sb-label">Academics</div>
+            <span class="sb-link sb-soon" aria-disabled="true"><i class="fa-solid fa-user-graduate"></i><span>Students</span><b class="sb-count">soon</b></span>
+            <span class="sb-link sb-soon" aria-disabled="true"><i class="fa-solid fa-layer-group"></i><span>Programmes</span><b class="sb-count">soon</b></span>
+            <span class="sb-link sb-soon" aria-disabled="true"><i class="fa-solid fa-calendar-check"></i><span>Attendance</span><b class="sb-count">soon</b></span>
+            <span class="sb-link sb-soon" aria-disabled="true"><i class="fa-solid fa-pen-ruler"></i><span>Assessments</span><b class="sb-count">soon</b></span>
+            <span class="sb-link sb-soon" aria-disabled="true"><i class="fa-solid fa-certificate"></i><span>Certificates</span><b class="sb-count">soon</b></span>
+            <div class="sb-label">Management</div>
+            {% if is_admin %}<a class="sb-link{% if active == 'team' %} active{% endif %}" href="{% url 'web:staff-team' %}"><i class="fa-solid fa-id-badge"></i><span>Staff</span></a>{% endif %}
+            <a class="sb-link{% if active == 'notifications' %} active{% endif %}" href="{% url 'web:staff-notifications' %}"><i class="fa-solid fa-bell"></i><span>Notifications</span>{% if unread %}<b class="sb-count">{{ unread }}</b>{% endif %}</a>
+            <span class="sb-link sb-soon" aria-disabled="true"><i class="fa-solid fa-chart-pie"></i><span>Reports</span><b class="sb-count">soon</b></span>
+            {% if is_admin %}<a class="sb-link{% if active == 'settings' %} active{% endif %}" href="{% url 'web:staff-settings' %}"><i class="fa-solid fa-gear"></i><span>Settings</span></a>{% endif %}
+        </nav>
+        <div class="sb-foot"><div class="sb-user"><span class="avatar sm">{{ user.full_name|initials }}</span><div class="meta"><strong>{{ user.full_name }}</strong><span>{{ user.role }}</span></div>
+            <form method="post" action="{% url 'web:logout' %}">{% csrf_token %}<button id="sbLogout" aria-label="Log out" title="Log out"><i class="fa-solid fa-arrow-right-from-bracket"></i></button></form></div></div>
+    </aside>
+    <a class="sb-backdrop" href="#" aria-label="Close menu"></a>
+
+    <div class="app-main">
+        <header class="topbar" id="topbar">
+            <a class="tb-btn tb-menu" href="#sidebar" aria-label="Open menu"><i class="fa-solid fa-bars"></i></a>
+            <div class="tb-title"><h1>{{ page_title }}</h1><p>{{ page_sub }}</p></div>
+            <form class="tb-search" id="tbSearch" method="get" action="{% url 'web:staff-search' %}" role="search"><i class="fa-solid fa-magnifying-glass"></i><input class="input" id="gSearch" name="q" type="search" value="{{ q|default:'' }}" placeholder="Search students, applications, payments…" aria-label="Search" autocomplete="off"></form>
+            <div class="tb-actions">
+                <details class="dropdown" id="bellDD"><summary class="tb-btn" id="bellBtn" aria-label="Notifications"><i class="fa-regular fa-bell"></i>{% if unread %}<span class="dotcount" id="bellCount">{% if unread > 9 %}9+{% else %}{{ unread }}{% endif %}</span>{% endif %}</summary>
+                    <div class="dropdown-menu" role="menu"><div class="dm-head"><h4>Notifications</h4>
+                        <form method="post" action="{% url 'web:staff-notifications' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="link-btn small" id="bellReadAll">Mark all read</button></form></div>
+                        <div class="dm-list" id="bellList">{% for n in bell %}
+                            <form method="post" action="{% url 'web:staff-notification' n.pk %}">{% csrf_token %}<button class="notif{% if not n.read %} unread{% endif %}"><span class="icon-tile"><i class="fa-solid fa-bell"></i></span><div><strong>{{ n.title }}</strong><p>{{ n.body|truncatechars:110 }}</p><small>{{ n.created_at|datetime_short }}</small></div></button></form>
+                        {% empty %}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-bell-slash"></i></div><h4>No notifications</h4></div>{% endfor %}</div>
+                        <div class="dm-foot"><a class="small" href="{% url 'web:staff-notifications' %}">View all</a></div></div>
+                </details>
+                <details class="dropdown" id="userDD"><summary class="tb-user" id="userBtn" aria-label="Account menu"><span class="avatar sm">{{ user.full_name|initials }}</span><span class="meta-txt"><strong>{{ first_name }}</strong><small>{{ user.role }}</small></span><i class="fa-solid fa-chevron-down small muted meta-txt"></i></summary>
+                    <div class="dropdown-menu" style="width:240px" role="menu"><div class="menu-list">
+                        <a href="{% url 'web:staff-dashboard' %}"><i class="fa-solid fa-gauge-high"></i>Dashboard</a>
+                        {% if is_admin %}<a href="{% url 'web:staff-settings' %}"><i class="fa-solid fa-gear"></i>Settings</a>{% endif %}
+                        <a href="/index.html" target="_blank" rel="noopener"><i class="fa-solid fa-globe"></i>View public website</a>
+                        <a href="{% url 'web:password' %}?next={{ request.get_full_path|urlencode }}" id="umPassword"><i class="fa-solid fa-key"></i>Change password</a>
+                        <form method="post" action="{% url 'web:logout' %}">{% csrf_token %}<button id="umLogout"><i class="fa-solid fa-arrow-right-from-bracket"></i>Log out</button></form></div></div>
+                </details>
+            </div>
+        </header>
+        <main class="view" id="view" tabindex="-1">
+            {% if messages %}{% for m in messages %}<div class="alert {% if m.tags == 'error' %}danger{% elif m.tags == 'warning' %}warning{% elif m.tags == 'success' %}success{% endif %} mb-2 toast-msg" role="status"><i class="fa-solid {% if m.tags == 'success' %}fa-circle-check{% elif m.tags == 'error' %}fa-circle-xmark{% else %}fa-circle-info{% endif %}"></i><p>{{ m }}</p></div>{% endfor %}{% endif %}
+            {% block view %}{% endblock %}
+        </main>
+    </div>
+</div>
+<nav class="bottom-nav" aria-label="Quick navigation">
+    <a href="{% url 'web:staff-dashboard' %}" class="{% if active == 'dashboard' %}active{% endif %}"><i class="fa-solid fa-house"></i>Home</a>
+    <a href="{% url 'web:staff-applications' %}" class="{% if active == 'applications' %}active{% endif %}"><i class="fa-solid fa-file-signature"></i>Apps</a>
+    <a href="{% url 'web:staff-awards' %}" class="{% if active == 'awards' %}active{% endif %}"><i class="fa-solid fa-award"></i>Awards</a>
+    <a href="{% url 'web:staff-payments' %}" class="{% if active == 'payments' %}active{% endif %}"><i class="fa-solid fa-naira-sign"></i>Payments</a>
+    <a href="#sidebar"><i class="fa-solid fa-grip"></i>More</a>
+</nav>
+</body>
+</html>

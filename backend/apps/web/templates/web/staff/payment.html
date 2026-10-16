@@ -1,0 +1,37 @@
+{% extends "web/staff/base.html" %}{% load web %}
+{% block view %}
+<p class="small mb-2"><a href="{% url 'web:staff-payments' %}"><i class="fa-solid fa-arrow-left"></i> All payments</a></p>
+<div class="view-head"><div><h2>{% if p.kind == "refund" %}Refund{% else %}Payment{% endif %} <span class="badge badge-{{ p.status|badge_tone }}">{{ p.status }}</span></h2><p class="mono">{{ p.reference }}</p></div>
+    <div class="actions">
+        {% if p.kind == "charge" and p.status in "PENDING FAILED" %}<form method="post">{% csrf_token %}<button class="btn btn-outline" name="action" value="check" id="pCheck"><i class="fa-solid fa-rotate"></i> Check with Zainpay</button></form>{% endif %}
+        {% if p.kind == "charge" and p.status in "SUCCESS REFUNDED" %}<a class="btn btn-primary" id="pReceipt" href="{% url 'web:staff-receipt' p.reference %}"><i class="fa-solid fa-receipt"></i> Receipt</a>{% endif %}
+    </div></div>
+<div class="dash-grid cols-12">
+<div class="panel span-8"><div class="panel-body">
+    {% if is_dup %}<div class="alert danger mb-2"><i class="fa-solid fa-triangle-exclamation"></i><p><b>Duplicate payment.</b> This fee was already paid by an earlier transaction. Send the money back by bank transfer, then record the refund here.</p></div>{% endif %}
+    <div class="kv">
+        <div><small>Amount</small><strong style="font-size:1.3rem;font-family:var(--font-head)">{{ p.amount|naira }}</strong></div>
+        <div><small>For</small><strong>{{ purpose }}{% if p.installment == 1 %} — 1st installment{% elif p.installment == 2 %} — balance{% endif %}</strong></div>
+        <div><small>Applicant</small><strong>{{ p.name }}</strong></div><div><small>Account email</small><strong>{{ p.email|default:"—" }}</strong></div>
+        <div><small>Application</small><strong>{% if p.application %}<a class="mono" href="{% url 'web:staff-application' p.application.number %}">{{ p.application.number }}</a>{% else %}—{% endif %}</strong></div>
+        <div><small>Student</small><strong>{{ student.student_no|default:"—" }}</strong></div>
+        <div><small>Gateway</small><strong>{% if p.gateway == "manual" %}Manual (bank transfer){% else %}Zainpay{% if p.channel %} · {{ p.get_channel_display }}{% endif %}{% endif %}</strong></div>
+        <div><small>Created</small><strong>{{ p.created_at|datetime_short }}</strong></div>
+        {% if p.verified_at %}<div><small>Confirmed</small><strong>{{ p.verified_at|datetime_short }}</strong></div>{% endif %}
+        {% if p.parent %}<div><small>Refund of</small><strong><a class="mono" href="{% url 'web:staff-payment' p.parent.reference %}">{{ p.parent.reference }}</a></strong></div>{% endif %}
+        {% if p.failure_reason %}<div class="full"><small>Failure reason</small><strong style="color:var(--danger)">{{ p.failure_reason }}</strong></div>{% endif %}
+        <div class="full"><small>Description</small><strong>{{ p.description }}</strong></div>
+    </div>
+</div></div>
+{% if is_dup %}
+<div class="panel span-4" id="refund"><div class="panel-head"><h3><i class="fa-solid fa-rotate-left"></i>Record refund</h3></div><div class="panel-body">
+    <p class="small muted">Send {{ p.amount|naira }} back to {{ p.name }} by bank transfer first, then record it here. The account holder is notified by email.</p>
+    <form method="post" id="rfForm" novalidate>{% csrf_token %}<input type="hidden" name="action" value="refund">
+        {% include "web/partials/field.html" with f=refund_form.transferRef req=1 cls="mb-2" %}
+        {% include "web/partials/field.html" with f=refund_form.note cls="mb-2" %}
+        <button class="btn btn-danger btn-block" id="rfSave">Record refund</button>
+    </form>
+</div></div>
+{% endif %}
+</div>
+{% endblock %}

@@ -45,43 +45,46 @@ with sync_playwright() as p:
 
     # 3. Staff login → staff dashboard
     login(page, "rabi@tsce.edu.ng", "Staff-Pass-2026")
-    page.wait_for_url("**/pages/staff/dashboard.html"); page.wait_for_selector("#userBtn")
-    check("topbar shows real name", "Rabi Isa" in page.inner_text("#userBtn"))
+    page.wait_for_url("**/staff/"); page.wait_for_selector("#userBtn")
+    check("topbar shows real name", "Rabi" in page.inner_text("#userBtn") and "Rabi Isa" in page.inner_text(".sb-user"))
     check("no demo pill", page.locator(".demo-pill").count() == 0)
-    check("settings hidden for non-admin", page.locator('.menu-list a[href="settings.html"]').count() == 0)
+    check("settings hidden for non-admin", page.locator('.menu-list a[href="/staff/settings/"]').count() == 0)
 
     # 4. Staff opening a student page is sent back to the staff portal
-    page.goto(f"{B}/pages/student/dashboard.html"); page.wait_for_url("**/pages/staff/dashboard.html")
-    check("staff blocked from student portal", page.url.endswith("/pages/staff/dashboard.html"))
+    page.goto(f"{B}/pages/student/dashboard.html"); page.wait_for_url("**/staff/")
+    check("staff blocked from student portal", page.url.endswith("/staff/"))
+    page.goto(f"{B}/my-applications/"); page.wait_for_url("**/staff/")
+    check("staff kept out of applicant pages", page.url.endswith("/staff/"))
 
     # 5. Change password from the user menu
-    page.click("#userBtn"); page.click("#umPassword")
-    page.fill("#cp0", "Staff-Pass-2026"); page.fill("#cp1", "Staff-Pass-2027"); page.fill("#cp2", "Staff-Pass-2027")
-    page.click("#cpSave"); page.wait_for_selector(".toast >> text=Password updated")
-    check("staff changed password", True)
+    page.click("#userBtn"); page.click("#umPassword"); page.wait_for_selector("#id_old_password")
+    page.fill("#id_old_password", "Staff-Pass-2026"); page.fill("#id_new_password1", "Staff-Pass-2027"); page.fill("#id_new_password2", "Staff-Pass-2027")
+    page.click("main button[type=submit]"); page.wait_for_url("**/staff/")
+    check("staff changed password", "password has been changed" in page.inner_text("#view"))
 
     # 6. Logout; signed-out portal redirects to login with ?next, which is honoured
-    page.evaluate("Auth.logout()"); page.wait_for_url("**/account/login/?out=1")
+    page.click("#userBtn"); page.click("#umLogout"); page.wait_for_url("**/account/login/?out=1")
     check("signed out notice", "signed out" in page.inner_text("main"))
-    page.goto(f"{B}/pages/staff/payments.html"); page.wait_for_url("**/account/login/?**")
-    check("signed-out portal redirects with next", "next=staff%2Fpayments.html" in page.url)
+    page.goto(f"{B}/staff/payments/"); page.wait_for_url("**/account/login/?**")
+    check("signed-out portal redirects with next", "next=%2Fstaff%2Fpayments%2F" in page.url)
     page.fill("#loginEmail", "rabi@tsce.edu.ng"); page.fill("#loginPassword", "Staff-Pass-2027")
-    page.click("#loginForm button[type=submit]"); page.wait_for_url("**/pages/staff/payments.html")
-    check("login honours next=", page.url.endswith("/pages/staff/payments.html"))
+    page.click("#loginForm button[type=submit]"); page.wait_for_url("**/staff/payments/")
+    check("login honours next=", page.url.endswith("/staff/payments/"))
 
-    # 7. Session dies mid-use → next API call (401) bounces to login
+    # 7. Session dies mid-use → the next page load asks to sign in again
     ctx.clear_cookies()
-    page.evaluate("API.post('auth/change-password', {}).catch(() => {})")
+    page.goto(f"{B}/staff/applications/")
     page.wait_for_url("**/account/login/?**")
-    check("401 on portal page redirects to login", "/account/login/" in page.url)
+    check("expired session redirects to login", "/account/login/" in page.url)
 
     # 8. Admin resets the student's password; student must change it
     login(page, "director@tsce.edu.ng", "Director-Pass-2026")
-    page.wait_for_url("**/pages/staff/dashboard.html")
-    check("admin sees Settings in menu", page.locator('.menu-list a[href="settings.html"]').count() == 1)
-    temp = page.evaluate("API.post('staff/users/3/reset-password').then(r => r.temporaryPassword)")
+    page.wait_for_url("**/staff/")
+    check("admin sees Settings in menu", page.locator('.menu-list a[href="/staff/settings/"]').count() == 1)
+    temp = page.evaluate("""fetch('/api/staff/users/3/reset-password', {method: 'POST', headers: {'X-CSRFToken':
+        document.cookie.split('; ').find(c => c.startsWith('csrftoken=')).split('=')[1]}}).then(r => r.json()).then(r => r.temporaryPassword)""")
     check("admin got a temporary password", temp and len(temp) == 10)
-    page.evaluate("Auth.logout()"); page.wait_for_url("**/account/login/?out=1")
+    page.click("#userBtn"); page.click("#umLogout"); page.wait_for_url("**/account/login/?out=1")
     login(page, "amina@example.com", temp)
     page.wait_for_url("**/account/password/"); page.wait_for_selector("#id_old_password")
     check("forced to choose a new password", "choose a new password" in page.inner_text("main").lower())

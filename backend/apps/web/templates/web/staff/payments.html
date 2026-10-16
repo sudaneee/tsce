@@ -1,0 +1,39 @@
+{% extends "web/staff/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Payments</h2><p>Every Zainpay transaction — programme fees (which include the application fee), earlier separate application fees and recorded refunds.</p></div>
+    <div class="actions"><a class="btn btn-outline" id="expPay" href="?{{ query }}{% if query %}&{% endif %}export=csv"><i class="fa-solid fa-file-csv"></i> Export CSV</a></div></div>
+<div class="kpis" id="payKpis">
+    <div class="kpi"><div class="kpi-top"><p class="label">Collected</p><span class="icon-tile grad"><i class="fa-solid fa-naira-sign"></i></span></div><div class="value">{{ summary.collected|naira }}</div><span class="trend flat">All successful payments</span></div>
+    <div class="kpi"><div class="kpi-top"><p class="label">Programme fees</p><span class="icon-tile green"><i class="fa-solid fa-graduation-cap"></i></span></div><div class="value">{{ summary.programmeFees|naira }}</div><span class="trend flat">Including installments</span></div>
+    <div class="kpi"><div class="kpi-top"><p class="label">Application fees</p><span class="icon-tile"><i class="fa-solid fa-file-invoice"></i></span></div><div class="value">{{ summary.applicationFees|naira }}</div><span class="trend flat">Paid separately before 4 Oct</span></div>
+    <div class="kpi"><div class="kpi-top"><p class="label">Pending / failed</p><span class="icon-tile gold"><i class="fa-solid fa-hourglass-half"></i></span></div><div class="value">{{ summary.pending }} / {{ summary.failed }}</div><span class="trend flat">Checked automatically every 5 min</span></div>
+    <a class="kpi" href="?dup=1" style="text-decoration:none"><div class="kpi-top"><p class="label">Duplicates to refund</p><span class="icon-tile {% if summary.duplicates %}red{% else %}cyan{% endif %}"><i class="fa-solid fa-rotate-left"></i></span></div><div class="value">{{ summary.duplicates }}</div><span class="trend flat">{{ summary.refunded|naira }} refunded so far</span></a>
+</div>
+<div class="panel">
+    <form class="table-tools" method="get">
+        <div class="input-icon"><i class="fa-solid fa-magnifying-glass"></i><input class="input" id="tSearch" name="q" value="{{ f.q|default:'' }}" placeholder="Search name, reference, application…" aria-label="Search transactions"></div>
+        <select class="select" id="tStatus" name="status" aria-label="Status"><option value="">All statuses</option>
+            <option{% if f.status == "SUCCESS" %} selected{% endif %}>SUCCESS</option><option{% if f.status == "PENDING" %} selected{% endif %}>PENDING</option><option{% if f.status == "FAILED" %} selected{% endif %}>FAILED</option><option{% if f.status == "REFUNDED" %} selected{% endif %}>REFUNDED</option></select>
+        <select class="select" id="tPurpose" name="purpose" aria-label="Fee"><option value="">Both fees</option><option value="programme_fee"{% if f.purpose == "programme_fee" %} selected{% endif %}>Programme fee</option><option value="application_fee"{% if f.purpose == "application_fee" %} selected{% endif %}>Application fee</option></select>
+        <label class="check small"><input type="checkbox" id="tDup" name="dup" value="1"{% if f.dup %} checked{% endif %}> Duplicates only</label>
+        <button class="btn btn-primary btn-sm" type="submit">Filter</button>
+        <a class="btn btn-ghost btn-sm" href="{% url 'web:staff-payments' %}"><i class="fa-solid fa-rotate-left"></i> Reset</a>
+    </form>
+    <div id="payTable">
+    {% if page.object_list %}
+    <div class="table-wrap"><table class="table">
+        <thead><tr><th>Reference</th><th>Applicant</th><th>For</th><th class="num">Amount</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody>{% for p in page.object_list %}<tr>
+            <td><a class="ref" href="{% url 'web:staff-payment' p.reference %}">{{ p.reference }}</a>{% if p.is_dup %} <span class="badge badge-danger no-dot">Duplicate</span>{% endif %}</td>
+            <td><div class="person"><span class="avatar sm">{{ p.name|initials }}</span><div><strong>{{ p.name }}</strong><small class="mono">{{ p.application.number|default:"" }}</small></div></div></td>
+            <td><span class="small">{% if p.purpose == "application_fee" %}Application fee{% else %}Programme fee{% endif %}{% if p.installment == 1 %} · 1st installment{% elif p.installment == 2 %} · balance{% endif %}{% if p.kind == "refund" %} · refund{% endif %}</span></td>
+            <td class="num"><b>{% if p.kind == "refund" %}−{% endif %}{{ p.amount|naira }}</b></td>
+            <td><span class="badge badge-{{ p.status|badge_tone }}">{{ p.status }}</span></td>
+            <td><span class="small">{{ p.verified_at|default:p.created_at|datetime_short }}</span></td>
+        </tr>{% endfor %}</tbody>
+    </table></div>
+    {% include "web/staff/pager.html" %}
+    {% else %}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-receipt"></i></div><h4>No transactions</h4><p>Nothing matches these filters yet.</p></div>{% endif %}
+    </div>
+</div>
+{% endblock %}

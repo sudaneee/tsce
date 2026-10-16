@@ -39,7 +39,7 @@ const Auth = (() => {
 
     function homeFor(role, s = current()) {
         if (role === "student") return "/my-applications/";  // the student portal is still being built
-        if (role === "staff" || role === "admin") return UI.url("pages/staff/dashboard.html");
+        if (role === "staff" || role === "admin") return "/staff/";
         if (role === "applicant" || role === "parent") return "/my-applications/";
         return UI.url("index.html");
     }

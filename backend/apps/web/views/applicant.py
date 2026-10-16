@@ -1,5 +1,6 @@
 """My applications, the invoice / checkout, payment status and the receipt."""
 import logging
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.db.models import Q
@@ -175,3 +176,15 @@ def legacy(request, page):
     else:
         target = "/my-applications/"
     return redirect(target, permanent=False)
+
+
+def legacy_staff(request, page):
+    q = request.GET
+    if page == "applications" and q.get("id"):
+        return redirect(reverse("web:staff-application", kwargs={"number": q["id"]}))
+    if page == "payments" and q.get("ref"):
+        return redirect(reverse("web:staff-payment", kwargs={"ref": q["ref"]}))
+    target = {"dashboard": "web:staff-dashboard", "applications": "web:staff-applications", "scholarships": "web:staff-awards",
+              "payments": "web:staff-payments", "staff": "web:staff-team", "settings": "web:staff-settings"}[page]
+    keep = {k: q[k] for k in ("status",) if q.get(k)}
+    return redirect(reverse(target) + (f"?{urlencode(keep)}" if keep else ""))

@@ -1,0 +1,24 @@
+{% extends "web/staff/base.html" %}{% load web %}
+{% block view %}
+<div class="welcome"><div style="position:relative;z-index:1"><span class="badge badge-primary no-dot">{% now "j F Y" %}</span><h2>{{ greeting }}, {{ first_name }}</h2>
+    <p>{{ s.intake|default:"No current intake" }}: <b>{{ s.awardsToVerify }}</b> Excellence Award{{ s.awardsToVerify|pluralize }} to verify{% if s.duplicates %} and <b>{{ s.duplicates }}</b> duplicate payment{{ s.duplicates|pluralize }} to refund{% endif %}.{% if s.cohortStart %} Classes begin <b>{{ s.cohortStart|longdate }}</b>.{% endif %}</p></div>
+    <div class="actions"><a class="btn btn-primary" href="{% url 'web:staff-awards' %}"><i class="fa-solid fa-award"></i> Verify awards</a><a class="btn btn-outline" href="{% url 'web:staff-applications' %}"><i class="fa-solid fa-file-signature"></i> Applications</a></div></div>
+<div class="kpis">
+    <a class="kpi" href="{% url 'web:staff-applications' %}" style="text-decoration:none"><div class="kpi-top"><p class="label">Applications</p><span class="icon-tile"><i class="fa-solid fa-file-signature"></i></span></div><div class="value">{{ s.applications.total|default:0 }}</div><span class="trend flat">{{ s.awardsToVerify }} awaiting award verification</span></a>
+    <a class="kpi" href="{% url 'web:staff-applications' %}?status=Admitted" style="text-decoration:none"><div class="kpi-top"><p class="label">Admitted</p><span class="icon-tile cyan"><i class="fa-solid fa-user-check"></i></span></div><div class="value">{{ s.applications.Admitted|default:0 }}</div><span class="trend flat">Programme fee not yet paid</span></a>
+    <a class="kpi" href="{% url 'web:staff-applications' %}?status=Enrolled" style="text-decoration:none"><div class="kpi-top"><p class="label">Enrolled</p><span class="icon-tile green"><i class="fa-solid fa-user-graduate"></i></span></div><div class="value">{{ s.enrolled }}</div><span class="trend flat">Paid in full or 1st installment</span></a>
+    <a class="kpi" href="{% url 'web:staff-awards' %}" style="text-decoration:none"><div class="kpi-top"><p class="label">Awards to verify</p><span class="icon-tile gold"><i class="fa-solid fa-award"></i></span></div><div class="value">{{ s.awardsToVerify }}</div><span class="trend flat">Waiting for a school visit</span></a>
+    <a class="kpi" href="{% url 'web:staff-payments' %}" style="text-decoration:none"><div class="kpi-top"><p class="label">Collected</p><span class="icon-tile grad"><i class="fa-solid fa-naira-sign"></i></span></div><div class="value">{{ s.revenue.total|naira }}</div><span class="trend flat">{{ s.revenue.lastWeek|naira }} in the last 7 days</span></a>
+</div>
+<div class="dash-grid cols-12">
+    <div class="panel span-7"><div class="panel-head"><div><h3><i class="fa-solid fa-clock-rotate-left"></i>Latest applications</h3></div><a class="btn btn-sm btn-soft" href="{% url 'web:staff-applications' %}">View all</a></div>
+        {% if recent %}<ul class="list">{% for a in recent %}<li><a class="list-item" href="{% url 'web:staff-application' a.number %}" style="color:inherit"><span class="avatar sm">{{ a.full_name|initials }}</span><div class="grow"><strong>{{ a.full_name }}</strong><small>{{ a.programme.name }} · {{ a.created_at|timesince }} ago{% if a.user.role == "parent" %} · via {{ a.user.full_name }}{% endif %}</small></div><span class="badge badge-{{ a.status|badge_tone }}">{{ a.status }}</span></a></li>{% endfor %}</ul>
+        {% else %}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-inbox"></i></div><h4>No applications yet</h4></div>{% endif %}</div>
+    <div class="panel span-5"><div class="panel-head"><div><h3><i class="fa-solid fa-chair"></i>Seats taken</h3><p>Programme fee paid (in full or 1st installment) · {{ s.intake|default:"" }}</p></div></div><div class="panel-body">
+        {% for r in seats %}<div class="mb-2"><div class="flex between small mb-1"><b>{{ r.programme }}</b><span class="muted">{{ r.taken }} / {{ r.capacity }}</span></div><div class="progress{% if r.pct > 85 %} gold{% endif %}"><span style="width:{{ r.pct }}%"></span></div></div>
+        {% empty %}<p class="muted small mb-0">No enrolments yet for this intake.</p>{% endfor %}
+        <div class="divider"></div>
+        <div class="flex between small"><span class="muted">Application fees (paid separately before 4 Oct)</span><b>{{ s.revenue.applicationFees|naira }}</b></div>
+        <div class="flex between small mt-1"><span class="muted">Programme fees</span><b>{{ s.revenue.programmeFees|naira }}</b></div></div></div>
+</div>
+{% endblock %}

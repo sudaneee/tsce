@@ -8,7 +8,7 @@
 <section class="section" style="padding-top:36px"><div class="container" id="wizardRoot"><div class="card"><div class="empty">
 {% if staff %}
     <div class="empty-icon"><i class="fa-solid fa-briefcase"></i></div><h4>You're signed in with a staff account</h4>
-    <p>Staff accounts can't apply. Sign out and use a student or parent account.</p><a class="btn btn-primary" href="/pages/staff/dashboard.html">Staff dashboard</a>
+    <p>Staff accounts can't apply. Sign out and use a student or parent account.</p><a class="btn btn-primary" href="/staff/">Staff dashboard</a>
 {% elif unverified %}
     <div class="empty-icon"><i class="fa-solid fa-envelope-circle-check"></i></div><h4>Verify your email first</h4>
     <p>Open the link we emailed to {{ user.email }}, then come back to apply.</p>

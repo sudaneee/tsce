@@ -190,3 +190,115 @@ class PayForm(forms.Form):
 
     def shown(self, plan: str):
         return self.cleaned_data["amount_half"] if plan == "half" else self.cleaned_data["amount_full"]
+
+
+# ---------------------------------------------------------------------------
+# Staff portal
+# ---------------------------------------------------------------------------
+class NoteForm(StyledForm):
+    note = forms.CharField(max_length=300, required=False, widget=forms.Textarea(attrs={"rows": 3, "class": "textarea"}))
+
+
+class RefundForm(StyledForm):
+    transferRef = forms.CharField(max_length=100, label="Bank transfer reference")
+    note = forms.CharField(max_length=300, required=False, widget=forms.TextInput(attrs={"placeholder": "e.g. Paid twice from two tabs"}))
+
+
+class StaffMemberForm(StyledForm):
+    ACCESS = [("none", "No login (e.g. instructor)"), ("staff", "Staff portal"), ("admin", "Admin (staff + settings)")]
+
+    fullName = forms.CharField(max_length=150, label="Full name", widget=forms.TextInput(attrs={"id": "st_n"}))
+    title = forms.CharField(max_length=120, label="Job title", widget=forms.TextInput(attrs={"id": "st_t", "placeholder": "e.g. Instructor — Networking"}))
+    email = forms.EmailField(required=False, widget=forms.EmailInput(attrs={"id": "st_e"}))
+    phone = forms.CharField(max_length=30, required=False, widget=forms.TextInput(attrs={"id": "st_p"}))
+    department = forms.ChoiceField(choices=[], widget=forms.Select(attrs={"id": "st_d"}))
+    access = forms.ChoiceField(choices=ACCESS, label="Portal access", initial="staff", widget=forms.Select(attrs={"id": "st_a"}))
+    status = forms.ChoiceField(choices=[], required=False, widget=forms.Select(attrs={"id": "st_s"}))
+
+    def __init__(self, *args, editing=None, is_self=False, **kwargs):
+        from apps.accounts.models import StaffProfile
+
+        super().__init__(*args, **kwargs)
+        self.fields["department"].choices = StaffProfile.Department.choices
+        self.fields["status"].choices = StaffProfile.Status.choices
+        if editing is None:
+            del self.fields["status"]
+        elif editing.user_id:
+            self.fields["email"].disabled = True  # the sign-in email isn't changed here
+        if is_self:
+            self.fields["access"].disabled = True
+            self.fields["status"].disabled = True
+
+    def clean_email(self):
+        return (self.cleaned_data.get("email") or "").strip().lower()
+
+    def clean_phone(self):
+        value = self.cleaned_data.get("phone") or ""
+        return normalize_ng_phone(value) if value else ""
+
+
+class InstitutionForm(StyledForm):
+    name = forms.CharField(max_length=200)
+    short = forms.CharField(max_length=20, label="Short name")
+    city = forms.CharField(max_length=120, required=False)
+    address = forms.CharField(max_length=300)
+    phones = forms.CharField(max_length=200, label="Phone numbers (comma-separated)")
+    email = forms.EmailField(required=False)
+    website = forms.CharField(max_length=120, required=False)
+    directorName = forms.CharField(max_length=120, required=False, label="Director's name (signs certificates)")
+    directorTitle = forms.CharField(max_length=120, required=False, label="Director's title")
+
+    def clean_phones(self):
+        phones = [x.strip() for x in self.cleaned_data["phones"].split(",") if x.strip()]
+        if not phones or len(phones) > 6:
+            raise ValidationError("Enter between one and six phone numbers, separated by commas.")
+        return phones
+
+
+class AdmissionsForm(StyledForm):
+    intake = forms.CharField(max_length=80, label="Current intake name")
+    opens = forms.DateField(required=False, label="Applications open", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+    closes = forms.DateField(required=False, label="Applications close", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+    cohortDate = forms.DateField(label="Classes start", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+    earlyBirdDeadline = forms.DateField(required=False, label="Early bird: programme fee paid before",
+                                        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+    applicationFee = forms.IntegerField(min_value=0, max_value=1_000_000, label="Application fee (₦, added to the programme fee)")
+    acceptingApplications = forms.BooleanField(required=False)
+    allowInstallments = forms.BooleanField(required=False)
+
+    def clean(self):
+        d = super().clean()
+        if d.get("opens") and d.get("closes") and d["opens"] > d["closes"]:
+            self.add_error("closes", "The closing date must be after the opening date.")
+        if d.get("closes") and d.get("cohortDate") and d["closes"] > d["cohortDate"]:
+            self.add_error("closes", "Applications should close on or before the cohort start date.")
+        return d
+
+
+class DiscountsForm(StyledForm):
+    earlyBirdPct = forms.IntegerField(min_value=0, max_value=100, label="Early bird (%)")
+    excellencePct = forms.IntegerField(min_value=0, max_value=100, label="Excellence Award (%)")
+    excellenceMinYear = forms.IntegerField(min_value=2000, max_value=2100, label="Excellence: WAEC/NECO from year")
+    excellenceMinAs = forms.IntegerField(min_value=1, max_value=9, label="Excellence: minimum A's")
+
+
+class NotificationSettingsForm(StyledForm):
+    emailNotifications = forms.BooleanField(required=False)
+    staffPaymentAlerts = forms.BooleanField(required=False)
+    staffApplicationAlerts = forms.BooleanField(required=False)
+
+
+class IntakeForm(StyledForm):
+    intake = forms.CharField(max_length=80, label="Intake name", widget=forms.TextInput(attrs={"placeholder": "e.g. January 2027 Cohort"}))
+    opens = forms.DateField(required=False, label="Applications open", widget=forms.DateInput(attrs={"type": "date"}))
+    closes = forms.DateField(required=False, label="Applications close", widget=forms.DateInput(attrs={"type": "date"}))
+    cohortDate = forms.DateField(label="Classes start", widget=forms.DateInput(attrs={"type": "date"}))
+    earlyBirdDeadline = forms.DateField(required=False, label="Early bird: paid before", widget=forms.DateInput(attrs={"type": "date"}))
+
+    def clean_intake(self):
+        from apps.programmes.models import Cohort
+
+        name = self.cleaned_data["intake"].strip()
+        if Cohort.objects.filter(name__iexact=name).exists():
+            raise ValidationError("An intake with that name already exists.")
+        return name

@@ -10,7 +10,7 @@
 </head>
 <body class="receipt-page">
 <div class="receipt-sheet">
-    <div class="no-print receipt-actions"><a class="btn btn-ghost btn-sm" href="{% url 'web:payment' payment.reference %}?fresh=0">← Back</a><button class="btn btn-primary btn-sm" onclick="window.print()">Print / Save as PDF</button></div>
+    <div class="no-print receipt-actions"><a class="btn btn-ghost btn-sm" href="{% if back_url %}{{ back_url }}{% else %}{% url 'web:payment' payment.reference %}?fresh=0{% endif %}">← Back</a><button class="btn btn-primary btn-sm" onclick="window.print()">Print / Save as PDF</button></div>
     <div class="receipt" id="receipt">
         <div class="receipt-head"><div class="flex"><img class="receipt-logo" src="/assets/logo/tsce-logo-full.png" alt="TSCE"><div><h3>{{ site.institution_name }}</h3><p>{{ site.address }}</p><p>{{ site.phones|join:", " }}{% if site.website %} · {{ site.website }}{% endif %}</p></div></div>
             <div style="text-align:right"><h3>PAYMENT RECEIPT</h3><p>{{ payment.verified_at|datetime_short }}</p></div></div>

@@ -1,0 +1,36 @@
+{% extends "web/staff/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Applications</h2><p>Every application for every intake. Applicants are admitted when they apply (the application fee is part of the programme fee); Excellence Award requests wait for verification.</p></div>
+    <div class="actions"><a class="btn btn-outline" id="appExport" href="?{{ query }}{% if query %}&{% endif %}export=csv"><i class="fa-solid fa-file-csv"></i> Export CSV</a></div></div>
+<div class="stat-chips" id="statusChips" role="tablist" aria-label="Filter by status">
+    {% for v, label, n in chips %}<a class="stat-chip{% if f.status|default:'' == v %} active{% endif %}" href="?{% if v %}status={{ v|urlencode }}&{% endif %}q={{ f.q|default:''|urlencode }}&programme={{ f.programme|default:'' }}&from={{ f.from|default:'' }}&to={{ f.to|default:'' }}">{{ label }} <b>{{ n }}</b></a>{% endfor %}
+</div>
+<div class="panel">
+    <form class="table-tools" method="get">
+        <input type="hidden" name="status" value="{{ f.status|default:'' }}">
+        <div class="input-icon"><i class="fa-solid fa-magnifying-glass"></i><input class="input" id="aSearch" name="q" value="{{ f.q|default:'' }}" placeholder="Search name, number, email, phone…" aria-label="Search applications"></div>
+        <select class="select" id="aProg" name="programme" aria-label="Programme"><option value="">All programmes</option>{% for p in programmes %}<option value="{{ p.slug }}"{% if f.programme == p.slug %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select>
+        <input type="date" class="input" name="from" value="{{ f.from|default:'' }}" aria-label="From date" style="width:auto"><input type="date" class="input" name="to" value="{{ f.to|default:'' }}" aria-label="To date" style="width:auto">
+        <button class="btn btn-primary btn-sm" type="submit">Filter</button>
+        <a class="btn btn-ghost btn-sm" href="{% url 'web:staff-applications' %}"><i class="fa-solid fa-rotate-left"></i> Reset</a>
+    </form>
+    <div id="appTable">
+    {% if page.object_list %}
+    <div class="table-wrap"><table class="table">
+        <thead><tr><th>Application</th><th>Applicant</th><th>Programme</th><th>Applied</th><th>Programme fee</th><th>Award</th><th>Status</th></tr></thead>
+        <tbody>{% for a in page.object_list %}
+        <tr>
+            <td><a class="ref" href="{% url 'web:staff-application' a.number %}">{{ a.number }}</a></td>
+            <td><div class="person"><span class="avatar sm">{{ a.full_name|initials }}</span><div><strong>{{ a.full_name }}</strong><small>{% if a.user.role == "parent" %}Parent: {{ a.user.full_name }}{% else %}{{ a.user.email }}{% endif %}</small></div></div></td>
+            <td><span class="small">{{ a.programme.name }}</span></td>
+            <td><span class="small">{{ a.created_at|shortdate }}</span></td>
+            <td><span class="badge badge-{{ a.payment_status|badge_tone }}">{{ a.payment_status }}</span>{% if a.payment_status == "Part Paid" %}<div class="small muted">{{ a.balance|naira }} balance</div>{% endif %}</td>
+            <td>{% if a.award_request %}<span class="badge badge-{{ a.award_request.status|badge_tone }}">{{ a.award_request.status }}</span>{% else %}<span class="muted small">—</span>{% endif %}</td>
+            <td><span class="badge badge-{{ a.status|badge_tone }}">{{ a.status }}</span></td>
+        </tr>{% endfor %}</tbody>
+    </table></div>
+    {% include "web/staff/pager.html" %}
+    {% else %}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-file-circle-question"></i></div><h4>No applications found</h4><p>Nothing matches these filters yet.</p></div>{% endif %}
+    </div>
+</div>
+{% endblock %}

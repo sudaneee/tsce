@@ -1,0 +1,67 @@
+{% extends "web/staff/base.html" %}{% load web %}
+{% block view %}
+<p class="small mb-2"><a href="{% url 'web:staff-applications' %}"><i class="fa-solid fa-arrow-left"></i> All applications</a></p>
+<div class="view-head"><div><h2>{{ app.full_name }}</h2><p><span class="mono">{{ app.number }}</span> · <span class="badge badge-{{ app.status|badge_tone }}">{{ app.status }}</span></p></div>
+    <div class="actions"><button class="btn btn-ghost" onclick="window.print()" title="Print"><i class="fa-solid fa-print"></i> Print</button></div></div>
+
+<div class="dash-grid cols-12" id="appDetail">
+<div class="span-8" style="display:grid;gap:20px;align-content:start">
+    <div class="panel"><div class="panel-body">
+        <div class="lifecycle">{% for s in tracker %}<div class="lc-step {{ s.state }}"><div class="c">{% if s.state == "done" %}<i class="fa-solid fa-check"></i>{% elif s.state == "bad" %}<i class="fa-solid fa-xmark"></i>{% else %}{{ s.n }}{% endif %}</div>{% if s.state == "bad" %}Rejected{% else %}{{ s.label }}{% endif %}</div>{% endfor %}</div>
+        {% if app.status == "Awaiting Verification" %}<div class="alert warning mb-0"><i class="fa-solid fa-id-card"></i><p><b>Excellence Award to verify.</b> Check the <b>original</b> WAEC/NECO result in person: {{ award.evidence }}. Approving or declining admits the applicant; declining means the normal fee.</p></div>{% endif %}
+    </div></div>
+
+    <div class="panel"><div class="panel-head"><h3><i class="fa-solid fa-layer-group"></i>Programme &amp; fees</h3></div><div class="panel-body"><div class="kv">
+        <div class="full"><small>Programme</small><strong>{{ app.programme.name }}</strong></div>
+        <div><small>Schedule</small><strong>{{ app.schedule }}</strong></div><div><small>Intake</small><strong>{{ app.cohort.name }}</strong></div>
+        <div><small>Application fee</small><strong>{{ app.application_fee|naira }} · {% if app.application_fee_paid_at %}paid separately {{ app.application_fee_paid_at|shortdate }}{% else %}included in the programme fee{% endif %}</strong></div>
+        <div><small>Programme fee</small><strong>{{ app.amount_payable|naira }}{% if app.discount_amount %} <span class="small muted">({{ app.get_discount_type_display }} −{{ app.discount_amount|naira }})</span>{% endif %} · <span class="badge badge-{{ app.payment_status|badge_tone }}">{{ app.payment_status }}</span></strong></div>
+        {% if app.payment_status == "Part Paid" %}<div class="full"><small>Installments</small><strong>{{ app.amount_paid|naira }} paid · <b>{{ app.balance|naira }} balance</b>{% if app.balance_due_date %} due {{ app.balance_due_date|shortdate }}{% endif %} <span class="small muted">— results and certificate withheld until paid</span></strong></div>{% endif %}
+        {% if award %}<div class="full"><small>Excellence Award</small><strong><span class="badge badge-{{ award.status|badge_tone }}">{{ award.status }}</span> {% if award.awarded_pct %}{{ award.awarded_pct }}%{% endif %}{% if award.note %} <span class="small muted">— {{ award.note }}</span>{% endif %}</strong></div>{% endif %}
+        {% if student %}<div><small>Student number</small><strong class="mono">{{ student.student_no }}</strong></div>{% endif %}
+    </div></div></div>
+
+    <div class="panel"><div class="panel-head"><h3><i class="fa-solid fa-user"></i>Applicant</h3></div><div class="panel-body"><div class="kv">
+        <div><small>Gender</small><strong>{{ app.gender }}</strong></div><div><small>Date of birth</small><strong>{{ app.dob|shortdate }}</strong></div>
+        <div><small>Phone</small><strong><a href="tel:{{ app.phone|cut:' ' }}">{{ app.phone }}</a></strong></div><div><small>Email</small><strong>{{ app.email|default:"—" }}</strong></div>
+        <div class="full"><small>Address</small><strong>{{ app.address }}</strong></div><div><small>State</small><strong>{{ app.state }}</strong></div><div><small>LGA</small><strong>{{ app.lga }}</strong></div>
+    </div></div></div>
+
+    <div class="panel"><div class="panel-head"><h3><i class="fa-solid fa-user-shield"></i>{% if app.user.role == "parent" %}Parent / guardian account{% else %}Account{% endif %}</h3></div><div class="panel-body"><div class="kv">
+        <div><small>Name</small><strong>{{ app.user.full_name }}</strong></div><div><small>Email</small><strong><a href="mailto:{{ app.user.email }}">{{ app.user.email }}</a></strong></div>
+        <div><small>Phone</small><strong>{{ app.user.phone|default:"—" }}</strong></div><div><small>Type</small><strong>{% if app.user.role == "parent" %}Parent{% else %}Self-applicant{% endif %}</strong></div>
+    </div></div></div>
+
+    <div class="panel"><div class="panel-head"><h3><i class="fa-solid fa-graduation-cap"></i>Education</h3></div><div class="panel-body"><div class="kv">
+        <div><small>Qualification</small><strong>{{ app.qualification }}</strong></div><div><small>Graduation year</small><strong>{{ app.grad_year|default:"—" }}</strong></div>
+        <div class="full"><small>Institution</small><strong>{{ app.institution }}</strong></div>
+        <div><small>WAEC/NECO</small><strong>{% if app.waec_status == "Available" %}{{ app.waec_year }} · {{ app.num_as }} A's{% else %}{{ app.waec_status }}{% endif %}</strong></div>
+        <div><small>Result document</small><strong>{% if app.waec_file %}<a href="{% url 'web:staff-waec' app.number %}" target="_blank" rel="noopener"><i class="fa-regular fa-file-lines"></i> Open uploaded result</a>{% else %}<span class="muted">Not uploaded</span>{% endif %}</strong></div>
+    </div></div></div>
+</div>
+
+<div class="span-4" style="display:grid;gap:20px;align-content:start">
+    {% if can_award or can_remind or can_reject %}
+    <div class="panel" id="actions"><div class="panel-head"><h3><i class="fa-solid fa-bolt"></i>Actions</h3></div><div class="panel-body">
+        <form method="post" class="stack" novalidate>{% csrf_token %}
+            <div class="field"><label for="id_note">Note <span class="muted small">(optional for awards; the reason is sent to the applicant when rejecting)</span></label><textarea id="id_note" name="note" class="textarea" maxlength="300" rows="3"></textarea></div>
+            {% if can_award %}
+            <button class="btn btn-success btn-block" name="action" value="award-yes"><i class="fa-solid fa-award"></i> Approve award ({{ award.requested_pct }}%) &amp; admit</button>
+            <button class="btn btn-soft-danger btn-block" name="action" value="award-no"><i class="fa-solid fa-xmark"></i> Decline award &amp; admit at full fee</button>
+            {% endif %}
+            {% if can_remind %}<button class="btn btn-outline btn-block" name="action" value="remind" data-act="remind"><i class="fa-regular fa-bell"></i> Send payment reminder</button>{% endif %}
+            {% if can_reject %}<button class="btn btn-ghost btn-block" name="action" value="reject" data-act="reject" style="color:var(--danger)"><i class="fa-solid fa-ban"></i> Reject application</button>{% endif %}
+        </form>
+    </div></div>
+    {% endif %}
+
+    <div class="panel"><div class="panel-head"><h3><i class="fa-solid fa-naira-sign"></i>Payments</h3></div>
+        {% if payments %}<ul class="list">{% for p in payments %}<li><a class="list-item" href="{% url 'web:staff-payment' p.reference %}" style="color:inherit;padding:12px 18px"><span class="icon-tile {% if p.status == 'SUCCESS' %}green{% elif p.status == 'FAILED' %}red{% endif %}"><i class="fa-solid fa-naira-sign"></i></span><div class="grow"><strong>{% if p.purpose == "application_fee" %}Application fee{% else %}Programme fee{% endif %}{% if p.installment == 1 %} (1st installment){% elif p.installment == 2 %} (balance){% endif %}{% if p.kind == "refund" %} refund{% endif %} · {{ p.amount|naira }}</strong><small class="mono">{{ p.reference }} · {{ p.verified_at|default:p.created_at|datetime_short }}</small></div><span class="badge badge-{{ p.status|badge_tone }}">{{ p.status }}</span></a></li>{% endfor %}</ul>
+        {% else %}<div class="panel-body"><p class="muted small mb-0">No payments yet.</p></div>{% endif %}</div>
+
+    <div class="panel"><div class="panel-head"><h3><i class="fa-solid fa-clock-rotate-left"></i>Activity</h3></div><div class="panel-body">
+        <ul class="history">{% for h in events %}<li class="{% if h.ok %}ok{% endif %}"><strong>{{ h.text }}</strong><small>{{ h.at|datetime_short }}{% if h.actor %} · {{ h.actor.full_name }}{% endif %}</small></li>{% endfor %}</ul>
+    </div></div>
+</div>
+</div>
+{% endblock %}

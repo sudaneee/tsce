@@ -1,0 +1,31 @@
+{% extends "web/staff/base.html" %}{% load web %}
+{% block view %}
+<p class="small mb-2"><a href="{% url 'web:staff-team' %}"><i class="fa-solid fa-arrow-left"></i> All staff</a></p>
+<div class="view-head"><div><h2>{% if profile %}Edit {{ profile.full_name }}{% else %}Add staff member{% endif %}</h2>{% if profile %}<p class="mono">{{ profile.staff_no }}</p>{% endif %}</div></div>
+<div class="panel" style="max-width:820px"><div class="panel-body">
+    {% if form.non_field_errors %}<div class="alert danger mb-2"><i class="fa-solid fa-circle-exclamation"></i><p>{{ form.non_field_errors|join:" " }}</p></div>{% endif %}
+    <form method="post" id="stf" novalidate>{% csrf_token %}
+        <div class="form-grid">
+            {% include "web/partials/field.html" with f=form.fullName req=1 %}
+            {% include "web/partials/field.html" with f=form.title req=1 %}
+            {% if profile.user_id %}{% include "web/partials/field.html" with f=form.email hint="This is their sign-in email." %}{% else %}{% include "web/partials/field.html" with f=form.email hint="Needed for portal access." %}{% endif %}
+            {% include "web/partials/field.html" with f=form.phone %}
+            {% include "web/partials/field.html" with f=form.department %}
+            {% include "web/partials/field.html" with f=form.access %}
+            {% if form.status %}{% include "web/partials/field.html" with f=form.status hint="On leave or inactive staff can't sign in." %}{% endif %}
+        </div>
+        {% if is_self %}<p class="hint mt-2">You can't change your own access or status.</p>{% endif %}
+        <div class="flex mt-3" style="justify-content:flex-end">
+            <a class="btn btn-ghost" href="{% url 'web:staff-team' %}">Cancel</a>
+            <button class="btn btn-primary" name="action" value="save" id="stSave">{% if profile %}Save changes{% else %}Add staff{% endif %}</button>
+        </div>
+    </form>
+    {% if profile and profile.user_id and access != "none" and not is_self %}
+    <div class="divider"></div>
+    <form method="post" class="flex between flex-wrap" style="align-items:center">{% csrf_token %}
+        <p class="small muted mb-0">Forgotten password? {{ profile.full_name }} gets a temporary password and must choose a new one at next sign-in.</p>
+        <button class="btn btn-ghost" name="action" value="reset" id="stReset"><i class="fa-solid fa-key"></i> Reset password</button>
+    </form>
+    {% endif %}
+</div></div>
+{% endblock %}

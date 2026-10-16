@@ -26,7 +26,7 @@ def applicant_required(view):
             return redirect(f"{LOGIN_URL}?{urlencode({'next': request.get_full_path()})}")
         if user.is_portal_staff:
             messages.info(request, "That page is for applicants. You're signed in with a staff account.")
-            return redirect("/pages/staff/dashboard.html")
+            return redirect("/staff/")
         if user.must_change_password:
             return redirect(f"/account/password/?{urlencode({'next': request.get_full_path()})}")
         return view(request, *args, **kwargs)

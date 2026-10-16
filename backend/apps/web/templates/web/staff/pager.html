@@ -1,0 +1,6 @@
+<div class="table-foot"><span>Showing <b>{{ page.start_index }}–{{ page.end_index }}</b> of <b>{{ page.paginator.count }}</b></span>
+{% if page.has_other_pages %}<div class="pager">
+    {% if page.has_previous %}<a href="?{{ query }}{% if query %}&{% endif %}page={{ page.previous_page_number }}" aria-label="Previous page"><i class="fa-solid fa-chevron-left"></i></a>{% endif %}
+    {% for n in page.paginator.page_range %}{% if n == page.number %}<a class="active" aria-current="page">{{ n }}</a>{% elif n == 1 or n == page.paginator.num_pages or n|add:"-1" == page.number or n|add:"1" == page.number %}<a href="?{{ query }}{% if query %}&{% endif %}page={{ n }}">{{ n }}</a>{% endif %}{% endfor %}
+    {% if page.has_next %}<a href="?{{ query }}{% if query %}&{% endif %}page={{ page.next_page_number }}" aria-label="Next page"><i class="fa-solid fa-chevron-right"></i></a>{% endif %}
+</div>{% endif %}</div>

@@ -1,4 +1,4 @@
-"""Browser test of the staff portal (Phase 5): dashboard, applications, awards, payments, staff, settings."""
+"""Browser test of the server-rendered staff portal: dashboard, applications, awards, payments, staff, settings."""
 import os
 import sys
 
@@ -21,10 +21,10 @@ def flat(text):
     return " ".join(text.split())
 
 
-def login(page, email, pw):
-    page.goto(f"{B}/pages/login.html?role=staff"); page.wait_for_selector("#loginForm")
+def login(page, email, pw, landing="**/staff/"):
+    page.goto(f"{B}/account/login/?role=staff"); page.wait_for_selector("#loginForm")
     page.fill("#loginEmail", email); page.fill("#loginPassword", pw)
-    page.click("#loginForm button[type=submit]"); page.wait_for_url("**/staff/dashboard.html")
+    page.click("#loginForm button[type=submit]"); page.wait_for_url(landing)
 
 
 with sync_playwright() as p:
@@ -33,94 +33,96 @@ with sync_playwright() as p:
 
     # ---------- Admissions officer ----------
     login(page, "rabi@tsce.edu.ng", "Staff-Pass-2026")
-    page.wait_for_selector(".kpis .kpi")
     kpis = flat(page.inner_text(".kpis"))
     check("dashboard: real numbers (3 applications, 1 enrolled)", "Applications 3" in kpis and "Enrolled 1" in kpis, kpis[:300])
-    check("dashboard: no demo figures", "324" not in page.inner_text("#view") and "11,850,000" not in page.inner_text("#view"))
-    page.wait_for_selector('[data-count-for="staff-scholarships"]:not([hidden])')
     check("sidebar: 1 award to verify", page.inner_text('[data-count-for="staff-scholarships"]') == "1")
     check("sidebar: 1 duplicate payment", page.inner_text('[data-count-for="staff-payments"]') == "1")
-    check("sidebar: unwired pages marked soon", page.locator('.sb-link[aria-disabled="true"]').count() == 7)
-    check("non-admin: no Staff / Settings", page.locator('.sb-link[href="staff.html"], .sb-link[href="settings.html"]').count() == 0)
-    page.goto(f"{B}/pages/staff/students.html"); page.wait_for_selector("#view .empty")
-    check("unwired page shows Coming soon, not demo data", "Coming soon" in page.inner_text("#view"))
+    check("sidebar: unwired pages marked soon", page.locator('.sb-link[aria-disabled="true"]').count() == 6)
+    check("non-admin: no Staff / Settings", page.locator('.sb-link[href="/staff/team/"], .sb-link[href="/staff/settings/"]').count() == 0)
+    res = page.goto(f"{B}/staff/settings/")
+    check("non-admin: settings forbidden", res.status == 403)
+    page.goto(f"{B}/pages/staff/dashboard.html"); page.wait_for_url("**/staff/")
+    check("old dashboard address redirects", page.url.endswith("/staff/"))
 
     # Bell (server notifications)
-    page.wait_for_selector("#bellCount:not([hidden])")
     check("bell: unread from server", page.inner_text("#bellCount") == "1")
-    page.click("#bellBtn"); page.click("#bellReadAll"); page.wait_for_selector("#bellCount[hidden]", state="attached")
-    check("bell: mark all read", True)
+    page.click("#bellBtn"); page.click("#bellReadAll"); page.wait_for_load_state("load")
+    check("bell: mark all read", page.locator("#bellCount").count() == 0)
 
-    # Applications list + drawer actions
-    page.goto(f"{B}/pages/staff/applications.html"); page.wait_for_selector("#appTable tbody tr")
+    # Applications list + actions
+    page.goto(f"{B}/staff/applications/"); page.wait_for_selector("#appTable tbody tr")
     check("applications: 3 rows", page.locator("#appTable tbody tr").count() == 3)
-    check("applications: status chips", "Awaiting Verification 1" in page.inner_text("#statusChips").replace("\n", " "))
-    page.fill("#aSearch", "aisha"); page.wait_for_timeout(600)
+    check("applications: status chips", "Awaiting Verification 1" in flat(page.inner_text("#statusChips")))
+    page.fill("#aSearch", "aisha"); page.press("#aSearch", "Enter"); page.wait_for_load_state("load")
     check("applications: search", page.locator("#appTable tbody tr").count() == 1)
-    page.click("#appTable tbody tr"); page.wait_for_selector(".drawer.open .dr-body")
-    check("drawer: application fee included in the programme fee", "included in the programme fee" in page.inner_text(".drawer.open .dr-body") and "55,000" in page.inner_text(".drawer.open .dr-body"))
-    page.click('.drawer.open [data-act="remind"]'); page.wait_for_selector(".toast >> text=Reminder sent")
-    check("remind: sent", True)
-    page.click('.drawer.open [data-act="reject"]'); page.fill("#anNote", "Incomplete details"); page.click("#anOk")
-    page.wait_for_selector(".toast >> text=Application rejected")
-    page.wait_for_timeout(500)
-    check("reject: status updated in list", "Rejected" in page.inner_text("#appTable"))
+    page.click("#appTable tbody tr a.ref"); page.wait_for_selector("#appDetail")
+    detail = page.inner_text("#appDetail")
+    check("detail: application fee included in the programme fee", "included in the programme fee" in detail and "55,000" in detail)
+    page.click('[data-act="remind"]'); page.wait_for_selector(".toast-msg")
+    check("remind: sent", "reminded about the programme fee" in page.inner_text(".toast-msg"))
+    page.fill("#id_note", "Incomplete details"); page.click('[data-act="reject"]'); page.wait_for_selector(".toast-msg")
+    check("reject: status updated", "Rejected" in page.inner_text(".view-head"))
 
     # Excellence Awards: verify Umar
-    page.goto(f"{B}/pages/staff/scholarships.html"); page.wait_for_selector("#awTable tbody tr")
+    page.goto(f"{B}/staff/awards/"); page.wait_for_selector("#awTable tbody tr")
     check("awards: Umar waiting", "Umar Bello" in page.inner_text("#awTable") and "Awaiting Verification" in page.inner_text("#awTable"))
-    page.click("#awTable tbody tr"); page.wait_for_selector('.drawer.open [data-act="award-yes"]')
-    check("drawer: verification instructions", "original" in page.inner_text(".drawer.open .dr-body"))
-    page.click('.drawer.open [data-act="award-yes"]'); page.fill("#anNote", "Original WAEC seen"); page.click("#anOk")
-    page.wait_for_selector(".toast >> text=Award approved")
-    page.wait_for_timeout(500)
-    page.click('#awTabs [data-tab="Approved"]')
+    page.click("#awTable >> text=Verify"); page.wait_for_selector('button[value="award-yes"]')
+    check("detail: verification instructions", "original" in page.inner_text("#appDetail"))
+    page.fill("#id_note", "Original WAEC seen"); page.click('button[value="award-yes"]'); page.wait_for_selector(".toast-msg")
+    check("award approved → admitted at 50%", "approved" in page.inner_text(".toast-msg") and "Admitted" in page.inner_text(".view-head"))
+    page.goto(f"{B}/staff/awards/?tab=Approved")
     check("awards: now approved", "Umar Bello" in page.inner_text("#awTable"))
 
     # Payments: duplicate refund
-    page.goto(f"{B}/pages/staff/payments.html"); page.wait_for_selector("#payTable tbody tr")
+    page.goto(f"{B}/staff/payments/"); page.wait_for_selector("#payTable tbody tr")
     check("payments: duplicate flagged", page.locator("#payTable .badge:has-text('Duplicate')").count() == 1)
-    page.check("#tDup"); page.wait_for_timeout(600)
-    page.click("#payTable tbody tr"); page.wait_for_selector(".drawer.open #pRefund")
-    page.click("#pRefund"); page.fill("#rfRef", "JAIZ-778899"); page.click("#rfSave")
-    page.wait_for_selector(".toast >> text=Refund recorded")
-    page.uncheck("#tDup"); page.wait_for_timeout(700)
+    page.check("#tDup"); page.click(".table-tools button[type=submit]"); page.wait_for_load_state("load")
+    page.click("#payTable tbody tr a.ref"); page.wait_for_selector("#rfForm")
+    page.fill("#id_transferRef", "JAIZ-778899"); page.click("#rfSave"); page.wait_for_selector(".toast-msg")
+    check("refund recorded", "Refund of" in page.inner_text(".toast-msg"))
+    page.goto(f"{B}/staff/payments/")
     check("payments: refund row recorded", "TSCE-ZP-20261001-000012-RF" in page.inner_text("#payTable"))
     check("payments: duplicates KPI back to 0", "Duplicates to refund 0" in flat(page.inner_text("#payKpis")))
+    with page.expect_download() as dl:
+        page.click("#expPay")
+    check("payments: CSV export", dl.value.suggested_filename == "tsce-payments.csv")
 
-    # Global search
-    page.keyboard.press("Control+k"); page.fill("#gSearch", "zainab"); page.wait_for_selector("#gResults.open .sr-item")
-    check("Ctrl K search finds application + student + payments", "TSCE/APP/2026/00003" in page.inner_text("#gResults") and "TSCE/2026/00001" in page.inner_text("#gResults"))
+    # Search
+    page.fill("#gSearch", "zainab"); page.press("#gSearch", "Enter"); page.wait_for_selector("#searchResults")
+    found = page.inner_text("#searchResults")
+    check("search finds application + student + payments", "TSCE/APP/2026/00003" in found and "TSCE/2026/00001" in found)
     ctx.close()
 
     # ---------- Admin ----------
     ctx = browser.new_context(); page = ctx.new_page(); watch(page)
     login(page, "director@tsce.edu.ng", "Director-Pass-2026")
-    page.goto(f"{B}/pages/staff/staff.html"); page.wait_for_selector("#sfT tbody tr")
+    page.goto(f"{B}/staff/team/"); page.wait_for_selector("#sfT tbody tr")
     check("staff list shows existing accounts", "Test Director" in page.inner_text("#sfT") and "Rabi Isa" in page.inner_text("#sfT"))
     page.click("#addStaff"); page.fill("#st_n", "Kamal Shehu"); page.fill("#st_t", "Bursar"); page.fill("#st_e", "bursary@tsce.edu.ng")
     page.fill("#st_p", "0803 111 2222"); page.select_option("#st_d", "Finance"); page.click("#stSave")
-    page.wait_for_selector(".modal >> text=Temporary password")
-    temp = page.inner_text(".modal .mono").strip()
+    page.wait_for_selector("#tempPassword")
+    temp = page.inner_text("#tempPassword").strip()
     check("new staff gets a temporary password", len(temp) == 10)
-    page.click(".modal [data-close]")
-    page.click("#addStaff"); page.fill("#st_n", "Engr. Musa Garba"); page.fill("#st_t", "Instructor — Networking")
+    page.goto(f"{B}/staff/team/new/"); page.fill("#st_n", "Engr. Musa Garba"); page.fill("#st_t", "Instructor — Networking")
     page.select_option("#st_d", "Academics"); page.select_option("#st_a", "none"); page.click("#stSave")
-    page.wait_for_selector(".toast >> text=Staff added"); page.wait_for_timeout(500)
+    page.wait_for_url("**/staff/team/")
     check("instructor added without login", "No login" in page.locator("#sfT tr", has_text="Musa Garba").inner_text())
 
-    page.goto(f"{B}/pages/staff/settings.html"); page.wait_for_selector("#adm")
+    page.goto(f"{B}/staff/settings/"); page.wait_for_selector("#admissions")
     check("settings: payments read-only info", "₦300" in page.inner_text("#pay") and "Bank transfer" in page.inner_text("#pay"))
-    page.fill("#a_o", "2026-09-01"); page.fill("#a_f", "6000"); page.click("#adm button.btn-primary")
-    page.wait_for_selector(".toast >> text=Settings saved")
-    site = page.evaluate("API.get('site').then(r => r.settings.admissions)")
+    page.fill("#id_admissions-opens", "2026-09-01"); page.fill("#id_admissions-applicationFee", "6000")
+    page.click("#admissions button.btn-primary"); page.wait_for_selector(".toast-msg")
+    site = page.evaluate("fetch('/api/site').then(r => r.json()).then(r => r.settings.admissions)")
     check("settings: application fee + opening date saved", site["applicationFee"] == 6000 and site["opens"] == "2026-09-01")
     ctx.close()
 
     # The new bursar signs in with the temporary password and must change it
     ctx = browser.new_context(); page = ctx.new_page(); watch(page)
-    login(page, "bursary@tsce.edu.ng", temp); page.wait_for_selector("#fpcForm")
-    check("new staff forced to choose a password", page.is_visible("#fpcForm"))
+    login(page, "bursary@tsce.edu.ng", temp, landing="**/account/password/?next=*")
+    check("new staff forced to choose a password", page.locator("#id_new_password1").count() == 1)
+    page.fill("#id_old_password", temp); page.fill("#id_new_password1", "Bursar-Pass-2027"); page.fill("#id_new_password2", "Bursar-Pass-2027")
+    page.click("main button[type=submit]"); page.wait_for_url("**/staff/")
+    check("after choosing a password the bursar reaches the dashboard", page.url.endswith("/staff/"))
     browser.close()
 
 for name, ok, detail in results:
