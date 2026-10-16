@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}TSCE{% endblock %} — TSCE</title>
+    <title>{% block title %}TSCE{% endblock %}{% block title_suffix %} — TSCE{% endblock %}</title>
     <meta name="description" content="{% block description %}{{ site.institution_name }}{% endblock %}">
     <meta name="theme-color" content="#0B1D55">
     {% block head_extra %}{% endblock %}
