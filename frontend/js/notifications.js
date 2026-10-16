@@ -130,6 +130,6 @@ Pages["news"] = async function () {
         <div class="news-body"><div class="news-meta"><span class="badge badge-primary no-dot">${UI.esc(a.tag)}</span><span>${UI.date(a.createdAt)}</span></div><h3>${UI.esc(a.title)}</h3><p>${UI.esc(a.body)}</p><button class="link-btn" data-read="${a.id}">Read more <i class="fa-solid fa-arrow-right"></i></button></div></article>`).join("") || UI.empty({ icon: "fa-newspaper", title: "No news yet" });
     UI.$("#eventList").innerHTML = events.map((e) => `<div class="tl-item reveal"><div class="tl-date"><b>${e.d}</b><small>${e.m}</small></div><div><h4>${e.t}</h4><p>${e.s}</p></div></div>`).join("");
     if (!list.length) UI.$("#newsGrid").innerHTML = `<div style="grid-column:1/-1">${UI.empty({ icon: "fa-newspaper", title: "No news yet", text: "Announcements from TSCE will appear here." })}</div>`;
-    UI.$$("[data-read]").forEach((b) => b.onclick = () => { const a = list.find((x) => String(x.id) === b.dataset.read); UI.modal({ title: UI.esc(a.title), subtitle: `${UI.date(a.createdAt)} · ${UI.esc(a.author)}`, body: `<p>${UI.esc(a.body)}</p>`, footer: `<a class="btn btn-primary" href="application.html">Apply now</a>` }); });
+    UI.$$("[data-read]").forEach((b) => b.onclick = () => { const a = list.find((x) => String(x.id) === b.dataset.read); UI.modal({ title: UI.esc(a.title), subtitle: `${UI.date(a.createdAt)} · ${UI.esc(a.author)}`, body: `<p>${UI.esc(a.body)}</p>`, footer: `<a class="btn btn-primary" href="/apply/">Apply now</a>` }); });
     UI.animateAll();
 };

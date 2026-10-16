@@ -1,0 +1,34 @@
+{% extends "web/base.html" %}{% load web %}
+{% block title %}Payment confirmed{% endblock %}
+{% block content %}
+<section class="section"><div class="container" id="successRoot">
+<div class="success-card">
+    <div class="success-top"><div class="success-mark"><svg viewBox="0 0 52 52"><path d="M14 27l8 8 16-17"/></svg></div>
+        <span class="badge badge-{% if payment.status == 'REFUNDED' %}info{% else %}success{% endif %} mb-2">{% if payment.status == "REFUNDED" %}Refunded{% else %}Payment verified{% endif %}</span>
+        <h1>{% if payment.purpose == "application_fee" %}APPLICATION FEE PAID{% elif payment.installment == 2 %}PROGRAMME FEE FULLY PAID{% else %}ENROLMENT CONFIRMED{% endif %}</h1>
+        <p class="muted" style="max-width:560px;margin:0 auto 12px">
+        {% if payment.purpose == "application_fee" %}Thank you. The application fee for {{ app.full_name }} is paid and credited against the programme fee.
+        {% elif payment.installment == 2 %}Thank you. The programme fee for {{ app.full_name }} is now fully paid.
+        {% else %}Thank you. {{ app.full_name }} is enrolled{% if student_no %} — student number <b>{{ student_no }}</b>{% endif %}.{% if payment.installment == 1 and app.balance %} The balance of <b>{{ app.balance|naira }}</b> is due{% if app.balance_due_date %} by <b>{{ app.balance_due_date|longdate }}</b>{% else %} before the programme ends{% endif %}.{% endif %}{% endif %}</p>
+        <div class="app-no"><div><small>Application Number</small><br><strong>{{ app.number }}</strong></div></div>
+    </div>
+    <div class="success-details">
+        <div><small>Applicant</small><strong>{{ app.full_name }}</strong></div>
+        <div><small>Programme</small><strong>{{ app.programme.name }}</strong></div>
+        <div><small>Cohort</small><strong>{{ app.cohort.name }}</strong></div>
+        <div><small>Paid for</small><strong>{{ paid_for }}</strong></div>
+        <div><small>Application status</small><span class="badge badge-{{ app.status|badge_tone }}">{{ app.status }}</span></div>
+        <div><small>Transaction reference</small><strong class="mono" style="font-size:.82rem">{{ payment.reference }}</strong></div>
+        <div><small>Amount paid</small><strong>{{ payment.amount|naira }}</strong></div>
+        {% if app.balance %}<div><small>Balance due</small><strong>{{ app.balance|naira }}</strong></div>{% endif %}
+        {% if payment.purpose != "application_fee" %}<div><small>Discount</small><strong>{% if payment.discount %}{{ app.get_discount_type_display }} (−{{ payment.discount|naira }}){% else %}None{% endif %}</strong></div>{% endif %}
+        <div><small>Classes begin</small><strong>{{ app.cohort.start_date|longdate }}</strong></div>
+    </div>
+    <div class="success-actions no-print">
+        <a class="btn btn-outline" id="dlReceipt" href="{% url 'web:receipt' payment.reference %}"><i class="fa-solid fa-receipt"></i> Receipt</a>
+        {% if app.balance and app.payment_status == "Part Paid" %}<a class="btn btn-grad" href="{% url 'web:pay' app.number %}"><i class="fa-solid fa-lock"></i> Pay balance · {{ app.balance|add:opts.charge|naira }}</a>{% endif %}
+        <a class="btn btn-primary" href="{% url 'web:my-applications' %}">My applications</a>
+    </div>
+</div>
+</div></section>
+{% endblock %}

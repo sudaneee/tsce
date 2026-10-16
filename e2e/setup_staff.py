@@ -61,4 +61,7 @@ Enrollment.objects.create(student=student, application=zainab, programme=zainab.
                           schedule=zainab.schedule, start_date=cohort.start_date,
                           end_date=zainab.programme.end_date_from(cohort.start_date), amount_paid=45000)
 Notification.objects.create(recipient=rabi, title="Excellence Award to verify", body="Umar Bello will bring a result.", type="scholarship")
+# Applications above were inserted directly: move the number counter past them.
+from apps.core.models import Sequence  # noqa: E402
+Sequence.objects.update_or_create(name="app", defaults={"value": Application.objects.count()})
 print("e2e setup done")

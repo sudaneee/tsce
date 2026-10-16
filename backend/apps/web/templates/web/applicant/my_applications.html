@@ -1,0 +1,58 @@
+{% extends "web/base.html" %}{% load web %}
+{% block title %}My applications{% endblock %}
+{% block content %}
+<section class="page-hero" style="padding:40px 0 32px"><div class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a><i class="fa-solid fa-chevron-right"></i><span>My applications</span></nav>
+    <div class="flex between flex-wrap" style="align-items:flex-end">
+        <div><h1 style="font-size:clamp(1.7rem,3vw,2.4rem);margin-bottom:6px">My applications</h1>
+            <p class="muted mb-0" id="maSub">Signed in as {{ user.full_name }}{% if parent %} (parent / guardian). Apply and pay for each of your children here{% endif %}.</p></div>
+        <div class="flex">
+            {% if admissions.open %}<a class="btn btn-primary" id="maNew" href="{% url 'web:apply' %}?new=1"><i class="fa-solid fa-plus"></i> {% if parent %}Apply for a child{% else %}New application{% endif %}</a>{% endif %}
+            <form method="post" action="{% url 'web:logout' %}">{% csrf_token %}<button class="btn btn-ghost" id="maLogout"><i class="fa-solid fa-right-from-bracket"></i> Sign out</button></form>
+        </div>
+    </div>
+</div></section>
+<section class="section" style="padding-top:36px"><div class="container" id="maRoot">
+{% if unknown_payment %}<div class="alert warning mb-3"><i class="fa-solid fa-circle-question"></i><p><b>We couldn't match that payment.</b> If you completed one, its status below updates within a few minutes. Contact TSCE if it doesn't.</p></div>{% endif %}
+{% if not cards %}
+    <div class="card"><div class="empty"><div class="empty-icon"><i class="fa-solid fa-file-signature"></i></div><h4>No applications yet</h4>
+        <p>{% if parent %}Apply for your child (or several children) — each gets their own application.{% else %}Choose a programme and apply in about 5 minutes.{% endif %}</p>
+        {% if admissions.open %}<a class="btn btn-primary" href="{% url 'web:apply' %}?new=1">{% if parent %}Apply for a child{% else %}Start application{% endif %}</a>{% endif %}</div></div>
+{% else %}
+<div class="stack">
+{% for c in cards %}{% with a=c.app n=c.next %}
+<article class="card card-pad" id="{{ a.number }}">
+    <div class="flex between flex-wrap mb-2" style="align-items:flex-start">
+        <div class="flex" style="align-items:flex-start"><span class="avatar">{{ a.full_name|initials }}</span><div><h3 class="mb-0" style="font-size:1.1rem">{{ a.full_name }}</h3>
+            <div class="small muted">{{ a.programme.name }} · {{ a.cohort.name }}</div><div class="small muted mono">{{ a.number }}</div></div></div>
+        <span class="badge badge-{{ a.status|badge_tone }}">{{ a.status }}</span>
+    </div>
+    <div class="lifecycle">{% for s in c.tracker %}<div class="lc-step {{ s.state }}"><div class="c">{% if s.state == "done" %}<i class="fa-solid fa-check"></i>{% elif s.state == "bad" %}<i class="fa-solid fa-xmark"></i>{% else %}{{ s.n }}{% endif %}</div>{{ s.label }}</div>{% endfor %}</div>
+
+    {% if n.kind == "verify" %}
+    <div class="alert warning"><i class="fa-solid fa-id-card"></i><p><b>Next step: visit TSCE with the original WAEC/NECO result</b> ({{ site.address }}). Admissions will verify it and approve the Excellence Award. You'll then be able to pay the programme fee here.</p></div>
+    {% elif n.kind == "pay" %}
+    <div class="alert success mb-2"><i class="fa-solid fa-circle-check"></i><p><b>Admitted!</b> {% if n.award_approved %}Excellence Award approved — {{ a.award_request.awarded_pct }}% off. {% elif n.award_declined %}The Excellence Award was not approved, so the normal fee applies. {% endif %}Pay the programme fee to secure {% if parent %}the{% else %}your{% endif %} seat (seats are limited).</p></div>
+    <div class="flex flex-wrap" style="align-items:center">
+        <a class="btn btn-grad" href="{% url 'web:pay' a.number %}"><i class="fa-solid fa-lock"></i> Pay programme fee · {{ n.opts.full|add:charge|naira }}</a>
+        {% if n.opts.half %}<a class="btn btn-outline" href="{% url 'web:pay' a.number %}?plan=half">or pay 50% now · {{ n.opts.half|add:charge|naira }}</a>{% endif %}
+        <span class="small muted">{{ a.fee|naira }}{% if a.discount_amount %} − {{ a.get_discount_type_display }} {{ a.discount_amount|naira }}{% endif %}{% if n.app_fee %} + application fee {{ n.app_fee|naira }}{% else %} · application fee already paid{% endif %}</span>
+    </div>
+    {% elif n.kind == "enrolled" %}
+    <div class="alert success mb-2"><i class="fa-solid fa-user-graduate"></i><p><b>Enrolled.</b> Student number <b class="mono">{{ n.student_no }}</b>. Classes begin {{ a.cohort.start_date|longdate }}.</p></div>
+    {% if n.part_paid %}<div class="alert warning mb-2"><i class="fa-solid fa-scale-balanced"></i><p><b>Balance due: {{ a.balance|naira }}</b>{% if a.balance_due_date %} by {{ a.balance_due_date|longdate }}{% endif %} ({{ a.amount_paid|naira }} of {{ a.amount_payable|naira }} paid). Results and the certificate are released once it's paid.</p></div>{% endif %}
+    <div class="flex flex-wrap">
+        {% if n.part_paid %}<a class="btn btn-grad" href="{% url 'web:pay' a.number %}"><i class="fa-solid fa-lock"></i> Pay balance · {{ a.balance|add:charge|naira }}</a>{% endif %}
+        {% if n.receipt %}<a class="btn btn-outline" href="{% url 'web:payment' n.receipt.reference %}?fresh=0"><i class="fa-solid fa-receipt"></i> Confirmation &amp; receipt</a>{% endif %}
+    </div>
+    {% elif n.kind == "rejected" %}
+    <div class="alert danger"><i class="fa-solid fa-circle-xmark"></i><p>This application was not successful. Contact the admissions office if you have questions.</p></div>
+    {% else %}
+    <div class="alert"><i class="fa-solid fa-circle-info"></i><p>This application is being processed.</p></div>
+    {% endif %}
+</article>
+{% endwith %}{% endfor %}
+</div>
+{% endif %}
+</div></section>
+{% endblock %}

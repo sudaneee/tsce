@@ -207,6 +207,21 @@ Permissions: `IsApplicant`, `IsStudent`, `IsStaff` (staff+admin), `IsAdmin`. Stu
 
 ### After launch
 
+**Server-rendered pages (decided 16 Oct 2026).** Business work belongs in Django views, not the browser: pages are
+rendered by Django templates (`backend/apps/web`), forms post to views, and every figure (fees, discounts,
+installments, balance, receipt lines, progress steps) is computed on the server. JavaScript is kept to small touches;
+menus work without it. CSS links carry a version, so browser/Cloudflare caches can't serve stale pages after a release.
+Old `pages/*.html` addresses of converted pages redirect to the new ones.
+
+- **Step 1 — applicant journey** ✔: `/account/login|register|verify-email|password/`, the 5-step application
+  (`/apply/1…4/`, step 5 `/apply/done/<number>/`), `/my-applications/`, `/pay/<number>/` (full / 50%),
+  `/payments/<ref>/` (confirmed / confirming / failed) and `/payments/<ref>/receipt/`.
+- **Step 2 — staff portal**: dashboard, applications, awards, payments, staff, settings.
+- **Step 3 — public site**: home, about, programmes, admissions, news, contact, certificate check.
+- **Step 4 — student portal** (Phase 7) built as templates from the start.
+- **Step 5 — clean-up**: delete the demo engine (`data.js`, `storage.js`, demo code in the JS files) and the API
+  endpoints no page uses any more (the Zainpay webhook/callback stay).
+
 **Phase 7 — Student portal**: dashboard, profile, programme (simplified Learning), attendance, results, payments, certificate, announcements, support, settings.
 
 **Phase 8 — Academics (staff)**: students CRUD, programmes CRUD, attendance marking, gradebook (draft/publish), certificates issue/revoke/print, announcements.

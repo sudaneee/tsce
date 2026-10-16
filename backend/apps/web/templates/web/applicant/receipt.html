@@ -1,0 +1,36 @@
+{% load web %}<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Receipt {{ payment.reference }} — TSCE</title>
+    <link rel="icon" href="/assets/logo/favicon.png" type="image/png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/main.css?v={{ asset_v }}">
+    <link rel="stylesheet" href="/css/web.css?v={{ asset_v }}">
+</head>
+<body class="receipt-page">
+<div class="receipt-sheet">
+    <div class="no-print receipt-actions"><a class="btn btn-ghost btn-sm" href="{% url 'web:payment' payment.reference %}?fresh=0">← Back</a><button class="btn btn-primary btn-sm" onclick="window.print()">Print / Save as PDF</button></div>
+    <div class="receipt" id="receipt">
+        <div class="receipt-head"><div class="flex"><img class="receipt-logo" src="/assets/logo/tsce-logo-full.png" alt="TSCE"><div><h3>{{ site.institution_name }}</h3><p>{{ site.address }}</p><p>{{ site.phones|join:", " }}{% if site.website %} · {{ site.website }}{% endif %}</p></div></div>
+            <div style="text-align:right"><h3>PAYMENT RECEIPT</h3><p>{{ payment.verified_at|datetime_short }}</p></div></div>
+        <table>
+            <tr><td>Receipt / Transaction Ref.</td><td class="mono">{{ payment.reference }}</td></tr>
+            <tr><td>Received from</td><td>{{ payment.name }}</td></tr>
+            <tr><td>Email</td><td>{{ payment.email|default:"—" }}</td></tr>
+            {% if app %}<tr><td>Application No.</td><td class="mono">{{ app.number }}</td></tr>{% endif %}
+            {% if student_no %}<tr><td>Student ID</td><td class="mono">{{ student_no }}</td></tr>{% endif %}
+            <tr><td>Description</td><td>{{ payment.description }}</td></tr>
+            <tr><td>Paid for</td><td>{{ paid_for }}</td></tr>
+            {% for label, value, neg in lines %}<tr><td>{{ label }}</td><td{% if neg %} style="color:var(--success)"{% endif %}>{{ value }}</td></tr>{% endfor %}
+            <tr><td>Payment gateway</td><td>Zainpay{% if payment.channel %} · {{ payment.get_channel_display }}{% endif %}</td></tr>
+            <tr><td>Status</td><td>{{ payment.status }}</td></tr>
+            <tr class="r-total"><td>Amount paid</td><td>{{ payment.amount|naira }}</td></tr>
+        </table>
+        {% if payment.status == "SUCCESS" %}<span class="stamp">PAID · VERIFIED</span>{% elif payment.status == "REFUNDED" %}<span class="stamp" style="border-color:var(--info);color:var(--info)">REFUNDED</span>{% endif %}
+        {% if charge %}<p class="small muted mt-2 mb-0">The {{ charge|naira }} Zainpay transaction charge is paid to the payment provider and is not included above.</p>{% endif %}
+        <p class="small muted mt-3 mb-0">This is a system-generated receipt from the TSCE Digital Platform{% if environment != "live" %} ({{ environment }} payment — no real funds were processed){% endif %}.</p>
+    </div>
+</div>
+</body>
+</html>

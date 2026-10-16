@@ -14,7 +14,7 @@ SIGNATURE = "\n\n— Trust Skill Acquisition Centre of Excellence (TSCE), Zaria"
 
 
 def site_link(path: str) -> str:
-    """Absolute link to a frontend page, e.g. site_link('pages/login.html')."""
+    """Absolute link to a frontend page, e.g. site_link('account/login/')."""
     return settings.SITE_URL.rstrip("/") + "/" + path.lstrip("/")
 
 

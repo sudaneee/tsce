@@ -1,0 +1,69 @@
+{% extends "web/base.html" %}{% load web %}
+{% block title %}Payment{% endblock %}
+{% block content %}
+<section class="page-hero" style="padding:40px 0 32px"><div class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a><i class="fa-solid fa-chevron-right"></i><a href="{% url 'web:my-applications' %}">My applications</a><i class="fa-solid fa-chevron-right"></i><span>Payment</span></nav>
+    <h1 style="font-size:clamp(1.7rem,3vw,2.4rem);margin-bottom:6px">Secure payment</h1><p class="muted mb-0">Pay the programme fee to secure the seat and complete enrolment.</p>
+</div></section>
+<section class="section" style="padding-top:36px"><div class="container" id="payRoot">
+<form method="post" class="pay-wrap" id="payForm" novalidate>
+    {% csrf_token %}
+    <div>
+        {% if failed %}<div class="alert danger mb-2" role="alert"><i class="fa-solid fa-circle-xmark"></i><p><b>Your last payment didn't go through.</b> No money was taken for it. You can try again below.</p></div>{% endif %}
+        {% if error %}<div class="alert danger mb-2" role="alert"><i class="fa-solid fa-circle-exclamation"></i><p>{{ error }}</p></div>{% endif %}
+        {% if notice %}<div class="alert warning mb-2" role="alert"><i class="fa-solid fa-circle-info"></i><p>{{ notice }}</p></div>{% endif %}
+        <div class="checkout">
+            <div class="checkout-head"><div class="zp-logo"><span class="zp-mark"><i class="fa-solid fa-bolt"></i></span><div>Zainpay<small>Secure checkout{% if environment != "live" %} · {{ environment }}{% endif %}</small></div></div>
+                <div class="amt"><small>{% if opts.half %}Total to pay now (full / 50%){% else %}Total to pay now{% endif %}</small><strong>{% if opts.half %}{{ opts.full|add:opts.charge|naira }} / {{ opts.half|add:opts.charge|naira }}{% else %}{{ opts.due_full|add:opts.charge|naira }}{% endif %}</strong></div></div>
+
+            {% if opts.half %}
+            <div style="padding:22px 24px 0"><p class="small mb-1" style="font-weight:600">How would you like to pay?</p>
+                <div class="stack" id="planPick" role="radiogroup" aria-label="Payment plan">
+                    <label class="option-card"><input type="radio" name="plan" value="full" {% if plan == "full" %}checked{% endif %}><span class="oc-radio"></span><span><strong>Pay in full · {{ opts.full|add:opts.charge|naira }}</strong><small>One payment — nothing more to pay.</small></span></label>
+                    <label class="option-card"><input type="radio" name="plan" value="half" {% if plan == "half" %}checked{% endif %}><span class="oc-radio"></span><span><strong>Pay 50% now · {{ opts.half|add:opts.charge|naira }}</strong><small>Enrols {% if parent %}your child{% else %}you{% endif %} and secures the seat. The balance of {{ opts.balance_after_half|naira }}{% if opts.charge %} (+ {{ opts.charge|naira }} charge){% endif %} is due before the programme ends; results and the certificate are released once it's paid.</small></span></label>
+                </div></div>
+            {% endif %}
+            {% if opts.is_balance %}
+            <div style="padding:22px 24px 0"><div class="alert mb-0"><i class="fa-solid fa-scale-balanced"></i><p><b>Programme fee balance.</b> {{ app.amount_paid|naira }} of {{ app.amount_payable|naira }} is paid.{% if app.balance_due_date %} The balance is due by <b>{{ app.balance_due_date|longdate }}</b>.{% endif %} Results and the certificate are released once it's paid.</p></div></div>
+            {% endif %}
+
+            <div style="padding:22px 24px 6px">
+                <p class="small muted mb-2">You'll be taken to Zainpay's secure payment page{% if not settings.allow_card %} to pay by bank transfer{% endif %}, then brought straight back here.</p>
+                <ul class="list"><li class="list-item"><span class="icon-tile"><i class="fa-solid fa-building-columns"></i></span><div class="grow"><strong>Bank transfer</strong><small>Pay from any Nigerian bank app</small></div></li></ul>
+            </div>
+            {# The amounts shown on this page, so the server can tell if the price changed in between. #}
+            <input type="hidden" name="amount_full" value="{{ opts.due_full }}">{% if opts.half %}<input type="hidden" name="amount_half" value="{{ opts.half }}">{% endif %}
+            <div style="padding:14px 24px 22px">
+                <button type="submit" class="btn btn-grad btn-lg btn-block" id="payNow"><i class="fa-solid fa-lock"></i> {% if opts.half %}Pay securely{% else %}Pay {{ opts.due_full|add:opts.charge|naira }} securely{% endif %}</button>
+                {% if opts.half %}<p class="hint mb-0 mt-1">You'll be charged for the option ticked above.</p>{% endif %}
+            </div>
+            <div class="pay-secure"><i class="fa-solid fa-shield-halved"></i> Secure payment powered by <b>Zainpay</b></div>
+        </div>
+        {% if environment != "live" %}<div class="sandbox-box no-print"><strong><i class="fa-solid fa-flask"></i> {% if environment == "simulated" %}Simulated payments{% else %}Zainpay sandbox{% endif %}</strong><p class="small mb-0">{% if environment == "simulated" %}This server uses the built-in payment simulator — no real money moves. You'll choose the outcome on the next page.{% else %}Sandbox mode — use Zainpay's test transfer details. No real money moves.{% endif %}</p></div>{% endif %}
+    </div>
+
+    <aside class="order-summary">
+        <div class="card card-pad">
+            <div class="flex between mb-2"><h3 class="mb-0" style="font-size:1.05rem">Programme fee{% if opts.is_balance %} balance{% endif %}</h3><span class="badge badge-{% if failed %}danger{% else %}warning{% endif %}">{% if failed %}Failed{% else %}Pending Payment{% endif %}</span></div>
+            <div class="flex mb-2" style="align-items:flex-start"><span class="icon-tile" style="background:{{ app.programme.color }};color:#fff"><i class="fa-solid {{ app.programme.icon }}"></i></span><div><strong style="font-family:var(--font-head)">{{ app.programme.name }}</strong><div class="small muted">{{ app.programme.weeks }} weeks · {{ app.cohort.name }}</div></div></div>
+            <div class="bank-box" style="margin-bottom:14px">
+                <div class="row"><span class="muted">Applicant</span><strong>{{ app.full_name }}</strong></div>
+                <div class="row"><span class="muted">Application No.</span><strong class="mono" style="font-size:.84rem">{{ app.number }}</strong></div>
+                <div class="row"><span class="muted">Schedule</span><strong style="font-size:.84rem;text-align:right">{{ app.schedule }}</strong></div>
+            </div>
+            <div class="fee-box">
+                <div class="fee-row"><span>Programme Fee</span><span>{{ app.fee|naira }}</span></div>
+                {% if app.discount_amount %}<div class="fee-row"><span>{{ app.get_discount_type_display }} ({{ app.discount_pct }}%)</span><span class="neg">−{{ app.discount_amount|naira }}</span></div>{% endif %}
+                {% if app_fee %}<div class="fee-row"><span>Application fee (non-refundable)</span><span>{{ app_fee|naira }}</span></div>{% elif app.application_fee_paid_at %}<div class="fee-row"><span>Application fee</span><span class="muted">already paid</span></div>{% endif %}
+                <div class="fee-row total"><span>Programme fee total</span><span>{{ app.amount_payable|naira }}</span></div>
+                {% if opts.is_balance %}<div class="fee-row"><span>Paid so far</span><span class="neg">−{{ app.amount_paid|naira }}</span></div><div class="fee-row"><span>Balance due now</span><span>{{ opts.balance|naira }}</span></div>{% endif %}
+                {% if opts.half %}<div class="fee-row"><span>50% option: pay now</span><span>{{ opts.half|naira }}</span></div><div class="fee-row"><span>50% option: balance later</span><span>{{ opts.balance_after_half|naira }}</span></div>{% endif %}
+                {% if opts.charge %}<div class="fee-row"><span>Zainpay transaction charge</span><span>{{ opts.charge|naira }}</span></div>{% endif %}
+            </div>
+            <div class="flex mt-2 small muted"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Instant confirmation &amp; e-receipt</div>
+            <div class="flex mt-1 small muted"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i> {% if opts.is_balance %}Fees cleared after payment{% else %}Enrolment confirmed after payment{% endif %}</div>
+        </div>
+    </aside>
+</form>
+</div></section>
+{% endblock %}

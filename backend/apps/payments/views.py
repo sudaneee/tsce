@@ -116,14 +116,9 @@ class PaymentCheckView(APIView):
 
 
 def _frontend_redirect(payment, outcome):
-    if payment and payment.status == Payment.Status.SUCCESS:
-        return HttpResponseRedirect("/pages/success.html?" + urlencode({"ref": payment.reference}))
-    query = {"result": outcome}
-    if payment:
-        query["ref"] = payment.reference
-        if payment.application_id:
-            query["app"] = payment.application.number
-    return HttpResponseRedirect("/pages/payment.html?" + urlencode(query))
+    """The payment page shows whichever state the payment is in (confirmed / confirming / failed)."""
+    query = "?check=1" if outcome == "pending" else ""
+    return HttpResponseRedirect(f"/payments/{payment.reference}/{query}")
 
 
 @csrf_exempt
@@ -140,7 +135,7 @@ def zainpay_callback(request):
     ref = request.GET.get("txnRef") or request.GET.get("reference") or request.session.get(SESSION_REF)
     payment = Payment.objects.select_related("application").filter(reference=ref).first() if ref else None
     if payment is None:
-        return HttpResponseRedirect("/pages/payment.html?" + urlencode({"result": "unknown"}))
+        return HttpResponseRedirect("/my-applications/?payment=unknown")
     request.session.pop(SESSION_REF, None)
     try:
         payment = services.process_payment(payment)

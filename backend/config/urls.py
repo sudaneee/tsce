@@ -12,6 +12,8 @@ admin.site.index_title = "Back office"
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("config.api_urls")),
+    # Server-rendered pages (apps/web). Everything else is still served from frontend/.
+    path("", include("apps.web.urls")),
 ]
 
 if settings.SERVE_FRONTEND:

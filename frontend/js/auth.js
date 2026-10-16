@@ -30,7 +30,7 @@ const Auth = (() => {
     async function logout(redirect = true) {
         try { await API.post("auth/logout"); } catch (e) { /* already signed out */ }
         user = null;
-        if (redirect) location.href = UI.url("pages/login.html?out=1");
+        if (redirect) location.href = "/account/login/?out=1";
     }
     async function changePassword(currentPassword, newPassword) {
         user = (await API.post("auth/change-password", { currentPassword, newPassword })).user;
@@ -38,13 +38,13 @@ const Auth = (() => {
     }
 
     function homeFor(role, s = current()) {
-        if (role === "student") return UI.url("pages/student/dashboard.html");
+        if (role === "student") return "/my-applications/";  // the student portal is still being built
         if (role === "staff" || role === "admin") return UI.url("pages/staff/dashboard.html");
-        if (role === "applicant" || role === "parent") return UI.url("pages/my-applications.html");
+        if (role === "applicant" || role === "parent") return "/my-applications/";
         return UI.url("index.html");
     }
     function loginUrl(portal) {
-        return UI.url(`pages/login.html?role=${portal}&next=${encodeURIComponent(location.pathname.split("/").slice(-2).join("/"))}`);
+        return (`/account/login/?role=${portal}&next=${encodeURIComponent(location.pathname.split("/").slice(-2).join("/"))}`);
     }
     /** Guards a portal page. portal: "student" | "staff". Returns the user or redirects. */
     function require(portal) {

@@ -28,7 +28,7 @@ from apps.core.models import Sequence, SiteSettings
 from .discounts import admissions_state, excellence_eligible, first_installment, programme_quote, seats_taken, today
 from .models import Application, ApplicationEvent, AwardRequest
 
-MY_APPLICATIONS = "pages/my-applications.html"
+MY_APPLICATIONS = "my-applications/"
 
 
 def naira(amount):

@@ -1,0 +1,8 @@
+{% extends "web/base.html" %}
+{% block title %}Applications closed{% endblock %}
+{% block content %}
+<section class="section"><div class="container" id="wizardRoot"><div class="card"><div class="empty">
+    <div class="empty-icon"><i class="fa-solid fa-door-closed"></i></div><h4>Applications are currently closed</h4>
+    <p>{{ message }}</p><a class="btn btn-primary" href="/pages/contact.html">Contact admissions</a> <a class="btn btn-ghost" href="{% url 'web:my-applications' %}">My applications</a>
+</div></div></div></section>
+{% endblock %}

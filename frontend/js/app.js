@@ -29,12 +29,12 @@ const App = (() => {
             <span class="pill">${eb ? "Early bird" : "Enrolling"}</span>
             <span><strong>${TSCE_FLYER.campaign}</strong> <span class="hide-sm">${Site.cohortDate ? `— classes start ${UI.dateLong(Site.day(Site.cohortDate))}` : ""}${eb ? ` · ${Discounts.RULES.earlybird.pct}% off when you pay before ${UI.date(Discounts.deadline(), { day: "numeric", month: "long" })}` : ""}.</span></span>
             <span class="countdown hide-sm"><i class="fa-regular fa-clock"></i> <span id="abCount">${countdownText()}</span></span>
-            <a href="${r}pages/application.html">Apply now →</a></div></div>`;
+            <a href="/apply/">Apply now →</a></div></div>`;
         const isActive = (href) => (href === "index.html" && page === "home") || (href.includes(page + ".html") && !href.includes("#"));
         const links = NAV.map(([h, t]) => `<li><a href="${r}${h}" class="${isActive(h) ? "active" : ""}" ${isActive(h) ? 'aria-current="page"' : ""}>${t}</a></li>`).join("");
         const s = Auth.current();
-        const portalItems = `<li><a href="${r}pages/login.html?role=student"><span class="icon-tile"><i class="fa-solid fa-user-graduate"></i></span><span>Student Portal<small>Programme, results & payments</small></span></a></li>
-            <li><a href="${r}pages/login.html?role=staff"><span class="icon-tile navy"><i class="fa-solid fa-briefcase"></i></span><span>Staff Portal<small>Admissions, finance & academics</small></span></a></li>
+        const portalItems = `<li><a href="/account/login/"><span class="icon-tile"><i class="fa-solid fa-user-graduate"></i></span><span>Student Portal<small>Programme, results & payments</small></span></a></li>
+            <li><a href="/account/login/?role=staff"><span class="icon-tile navy"><i class="fa-solid fa-briefcase"></i></span><span>Staff Portal<small>Admissions, finance & academics</small></span></a></li>
             <li><a href="${r}pages/verify.html"><span class="icon-tile green"><i class="fa-solid fa-shield-halved"></i></span><span>Verify Certificate<small>Check a TSCE certificate</small></span></a></li>`;
         const html = `${bar}<header class="site-header" id="siteHeader"><div class="container nav">
             ${UI.brand(r + "index.html")}
@@ -42,14 +42,14 @@ const App = (() => {
             <div class="nav-actions">
                 <div class="nav-drop" id="portalDrop"><button class="btn btn-ghost btn-sm nav-drop-btn" aria-haspopup="true" aria-expanded="false"><i class="fa-regular fa-circle-user"></i> <span class="hide-sm">${s ? "My portal" : "Portals"}</span> <i class="fa-solid fa-chevron-down" style="font-size:.7em"></i></button>
                     <ul class="nav-drop-menu">${s ? `<li><a href="${Auth.homeFor(s.role, s)}"><span class="icon-tile green"><i class="fa-solid fa-arrow-right-to-bracket"></i></span><span>Continue as ${UI.esc(s.name.split(" ")[0])}<small>${s.role} portal</small></span></a></li>` : ""}${portalItems}</ul></div>
-                <a class="btn btn-primary btn-sm btn-apply-desktop" href="${r}pages/application.html">Apply Now <i class="fa-solid fa-arrow-right"></i></a>
+                <a class="btn btn-primary btn-sm btn-apply-desktop" href="/apply/">Apply Now <i class="fa-solid fa-arrow-right"></i></a>
                 <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav"><i class="fa-solid fa-bars"></i></button>
             </div></div></header>
             <div class="mobile-nav" id="mobileNav" aria-hidden="true"><div class="mn-backdrop"></div><div class="mn-panel" role="dialog" aria-label="Menu">
                 <div class="mn-head">${UI.brand(r + "index.html")}<button class="modal-close" id="mnClose" aria-label="Close menu"><i class="fa-solid fa-xmark"></i></button></div>
                 <ul class="mn-links">${NAV.map(([h, t, i]) => `<li><a href="${r}${h}" class="${isActive(h) ? "active" : ""}"><i class="fa-solid ${i}"></i>${t}</a></li>`).join("")}
-                    <li><a href="${r}pages/login.html?role=student"><i class="fa-solid fa-user-graduate"></i>Student Portal</a></li><li><a href="${r}pages/login.html?role=staff"><i class="fa-solid fa-briefcase"></i>Staff Portal</a></li></ul>
-                <a class="btn btn-primary btn-lg btn-block" href="${r}pages/application.html">Apply Now</a>
+                    <li><a href="/account/login/"><i class="fa-solid fa-user-graduate"></i>Student Portal</a></li><li><a href="/account/login/?role=staff"><i class="fa-solid fa-briefcase"></i>Staff Portal</a></li></ul>
+                <a class="btn btn-primary btn-lg btn-block" href="/apply/">Apply Now</a>
                 <div class="mt-3 small muted">${TSCE_FLYER.phones.map((p) => `<div><i class="fa-solid fa-phone"></i> <a href="tel:${p.replace(/\s/g, "")}">${p}</a></div>`).join("")}</div>
             </div></div>`;
         UI.$("#site-header").outerHTML = html;
@@ -81,7 +81,7 @@ const App = (() => {
                 <div>${UI.brand(r + "index.html")}<p class="mt-2" style="max-width:300px">Practical, career-focused digital skills training for the next generation of technology professionals in Northern Nigeria and beyond.</p>
                     <ul class="f-contact mt-2"><li><i class="fa-solid fa-location-dot"></i><span>${TSCE_FLYER.address}</span></li></ul></div>
                 <div><h5>TSCE</h5><ul><li><a href="${r}pages/about.html">About</a></li><li><a href="${r}pages/programmes.html">Programmes</a></li><li><a href="${r}pages/admissions.html">Admissions</a></li><li><a href="${r}pages/contact.html">Contact</a></li></ul></div>
-                <div><h5>Students</h5><ul><li><a href="${r}pages/login.html?role=student">Student Portal</a></li><li><a href="${r}pages/student/payments.html">Payments</a></li><li><a href="${r}pages/student/results.html">Results</a></li><li><a href="${r}pages/verify.html">Certificates</a></li></ul></div>
+                <div><h5>Students</h5><ul><li><a href="/account/login/">Student Portal</a></li><li><a href="${r}pages/student/payments.html">Payments</a></li><li><a href="${r}pages/student/results.html">Results</a></li><li><a href="${r}pages/verify.html">Certificates</a></li></ul></div>
                 <div><h5>Resources</h5><ul><li><a href="${r}pages/news.html">News</a></li><li><a href="${r}pages/news.html#events">Events</a></li><li><a href="${r}index.html#faq">FAQs</a></li><li><a href="${r}pages/contact.html">Support</a></li></ul></div>
                 <div><h5>Connect</h5><ul class="f-contact">${TSCE_FLYER.phones.map((p) => `<li><i class="fa-solid fa-phone"></i><a href="tel:${p.replace(/\s/g, "")}">${p}</a></li>`).join("")}<li><i class="fa-solid fa-globe"></i><a href="#">${TSCE_FLYER.website}</a></li></ul>
                     <div class="socials mt-2">${TSCE_FLYER.socials.map((s) => `<a href="${s.url}" aria-label="${s.label}" title="${s.label}"><i class="fa-brands ${s.icon}"></i></a>`).join("")}</div></div>
@@ -142,7 +142,7 @@ Pages["admissions"] = function () {
         ex.innerHTML = `<div class="fee-box"><div class="fee-head"><strong style="font-family:var(--font-head)">Example: ${UI.esc(p.name)}</strong>${eb ? UI.badge("Early bird active") : UI.badge("Closed")}</div>
             <div class="fee-row"><span>Programme Fee</span><span>${UI.naira(f.fee)}</span></div><div class="fee-row"><span>Early Bird Discount (${f.pct}%)</span><span class="neg">−${UI.naira(f.discount)}</span></div><div class="fee-row total"><span>Amount Payable</span><span>${UI.naira(f.payable)}</span></div></div>`;
     }
-    UI.$("#feeTable").innerHTML = Programmes.active().map((p) => `<tr><td><div class="person"><span class="icon-tile" style="width:34px;height:34px;border-radius:10px;background:${p.color};color:#fff;font-size:.8rem"><i class="fa-solid ${p.icon}"></i></span><strong>${UI.esc(p.name)}</strong></div></td><td>${p.weeks} Weeks</td><td class="num"><b>${UI.naira(p.fee)}</b></td><td class="num" style="color:var(--success);font-weight:700">${UI.naira(p.fee * .85)}</td><td class="num">${UI.naira(p.fee * .5)}</td><td><a class="btn btn-xs btn-soft" href="application.html?programme=${p.id}">Apply</a></td></tr>`).join("");
+    UI.$("#feeTable").innerHTML = Programmes.active().map((p) => `<tr><td><div class="person"><span class="icon-tile" style="width:34px;height:34px;border-radius:10px;background:${p.color};color:#fff;font-size:.8rem"><i class="fa-solid ${p.icon}"></i></span><strong>${UI.esc(p.name)}</strong></div></td><td>${p.weeks} Weeks</td><td class="num"><b>${UI.naira(p.fee)}</b></td><td class="num" style="color:var(--success);font-weight:700">${UI.naira(p.fee * .85)}</td><td class="num">${UI.naira(p.fee * .5)}</td><td><a class="btn btn-xs btn-soft" href="/apply/?programme=${p.id}">Apply</a></td></tr>`).join("");
     faq();
     UI.animateAll();
 };

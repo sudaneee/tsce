@@ -1,0 +1,23 @@
+{% extends "web/auth/base.html" %}
+{% block title %}Create an account{% endblock %}
+{% block side %}<h2>Apply in three simple steps.</h2><p>Create your account, verify your email, then apply — there's nothing to pay until you're admitted. Parents can apply for more than one child from one account.</p>
+<div class="auth-points"><div><i class="fa-solid fa-envelope-circle-check"></i>Verify your email</div><div><i class="fa-solid fa-file-signature"></i>Apply — admission is immediate</div><div><i class="fa-solid fa-user-check"></i>Pay the programme fee online</div></div>{% endblock %}
+{% block box %}
+<div id="regRoot">
+<h1 class="mt-3">Create your account</h1><p class="muted">Who are you applying for?</p>
+{% if error %}<div class="alert danger mb-2" role="alert"><i class="fa-solid fa-circle-exclamation"></i><p>{{ error }}</p></div>{% endif %}
+<form id="regForm" method="post" novalidate>
+    {% csrf_token %}
+    <div class="option-grid mb-3" role="radiogroup" aria-label="Account type">
+        {% for r in form.accountType %}<label class="option-card">{{ r.tag }}<span class="oc-radio"></span><span><strong>{{ r.choice_label }}</strong><small>{% if r.data.value == "parent" %}Parent or guardian — apply for one or more children{% else %}I'm applying for my own training{% endif %}</small></span></label>{% endfor %}
+    </div>
+    {% include "web/partials/field.html" with f=form.fullName req=1 cls="mb-2" %}
+    {% include "web/partials/field.html" with f=form.email req=1 cls="mb-2" hint="We'll send a verification link here." %}
+    {% include "web/partials/field.html" with f=form.phone req=1 cls="mb-2" %}
+    {% include "web/partials/field.html" with f=form.password req=1 cls="mb-2" hint="At least 8 characters. Avoid common words or only numbers." %}
+    {% include "web/partials/field.html" with f=form.password2 req=1 cls="mb-3" %}
+    <button type="submit" class="btn btn-primary btn-lg btn-block">Create account <i class="fa-solid fa-arrow-right"></i></button>
+</form>
+<p class="small muted mt-3">Already have an account? <a href="{% url 'web:login' %}">Sign in</a></p>
+</div>
+{% endblock %}

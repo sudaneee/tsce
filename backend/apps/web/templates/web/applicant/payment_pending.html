@@ -1,0 +1,21 @@
+{% extends "web/base.html" %}{% load web %}
+{% block title %}Confirming payment{% endblock %}
+{% block head_extra %}{% if next_check %}<meta http-equiv="refresh" content="5;url={% url 'web:payment' payment.reference %}?check={{ next_check }}">{% endif %}{% endblock %}
+{% block content %}
+<section class="section"><div class="container" id="payRoot">
+<div class="card card-pad" style="max-width:720px;margin:0 auto">
+    <div class="alert warning mb-2" id="pendingBox" role="status"><i class="fa-solid fa-hourglass-half"></i><p><b>We're confirming your payment with Zainpay…</b>
+        {% if next_check %}This usually takes a few seconds, but bank transfers can take a few minutes. This page checks again by itself.
+        {% else %}It's taking longer than usual. If you paid, you don't need to pay again — it will be confirmed automatically and you'll get a notification.{% endif %}</p></div>
+    <div class="bank-box mb-2">
+        <div class="row"><span class="muted">Reference</span><strong class="mono">{{ payment.reference }}</strong></div>
+        <div class="row"><span class="muted">Amount</span><strong>{{ payment.amount|naira }}</strong></div>
+        {% if app %}<div class="row"><span class="muted">Application</span><strong>{{ app.full_name }} · {{ app.number }}</strong></div>{% endif %}
+    </div>
+    <div class="flex flex-wrap">
+        <form method="post" action="{% url 'web:payment-check' payment.reference %}">{% csrf_token %}<button class="btn btn-primary" id="checkNow"><i class="fa-solid fa-rotate"></i> Check now</button></form>
+        <a class="btn btn-ghost" href="{% url 'web:my-applications' %}">My applications</a>
+    </div>
+</div>
+</div></section>
+{% endblock %}

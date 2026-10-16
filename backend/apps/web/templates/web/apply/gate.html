@@ -1,0 +1,22 @@
+{% extends "web/base.html" %}
+{% block title %}Online application{% endblock %}
+{% block content %}
+<section class="page-hero" style="padding:40px 0 32px"><div class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a><i class="fa-solid fa-chevron-right"></i><a href="/pages/admissions.html">Admissions</a><i class="fa-solid fa-chevron-right"></i><span>Application</span></nav>
+    <h1 style="font-size:clamp(1.7rem,3vw,2.4rem);margin-bottom:6px">Online application</h1>
+</div></section>
+<section class="section" style="padding-top:36px"><div class="container" id="wizardRoot"><div class="card"><div class="empty">
+{% if staff %}
+    <div class="empty-icon"><i class="fa-solid fa-briefcase"></i></div><h4>You're signed in with a staff account</h4>
+    <p>Staff accounts can't apply. Sign out and use a student or parent account.</p><a class="btn btn-primary" href="/pages/staff/dashboard.html">Staff dashboard</a>
+{% elif unverified %}
+    <div class="empty-icon"><i class="fa-solid fa-envelope-circle-check"></i></div><h4>Verify your email first</h4>
+    <p>Open the link we emailed to {{ user.email }}, then come back to apply.</p>
+    <form method="post" action="{% url 'web:resend-verification' %}">{% csrf_token %}<input type="hidden" name="email" value="{{ user.email }}"><button class="btn btn-primary">Send a new link</button></form>
+{% else %}
+    <div class="empty-icon"><i class="fa-solid fa-user-plus"></i></div><h4>Create an account to apply</h4>
+    <p>Applications are made from your TSCE account, so you can pay, follow your admission and come back any time. Parents can apply for several children from one account.</p>
+    <a class="btn btn-primary" href="{% url 'web:register' %}">Create an account</a> <a class="btn btn-ghost" href="{% url 'web:login' %}?next={{ request.get_full_path|urlencode }}">Sign in</a>
+{% endif %}
+</div></div></div></section>
+{% endblock %}

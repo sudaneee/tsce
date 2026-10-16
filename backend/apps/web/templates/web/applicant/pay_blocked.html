@@ -1,0 +1,20 @@
+{% extends "web/base.html" %}
+{% block title %}Payment{% endblock %}
+{% block content %}
+<section class="section"><div class="container" id="payRoot"><div class="card"><div class="empty">
+{% if app.status == "Rejected" %}
+    <div class="empty-icon"><i class="fa-solid fa-circle-xmark"></i></div><h4>This application was not successful</h4>
+    <p>It can no longer be paid. Contact the admissions office if you have questions.</p>
+{% elif app.payment_status == "Paid" %}
+    <div class="empty-icon"><i class="fa-solid fa-circle-check"></i></div><h4>The programme fee is already paid</h4>
+    <p>{{ app.full_name }} is enrolled and the fees are fully paid.</p>
+{% elif app.status == "Awaiting Verification" %}
+    <div class="empty-icon"><i class="fa-solid fa-id-card"></i></div><h4>Excellence Award verification pending</h4>
+    <p>Bring the original WAEC/NECO result to TSCE ({{ site.address }}). You can pay the programme fee once admissions has verified it.</p>
+{% else %}
+    <div class="empty-icon"><i class="fa-solid fa-hourglass-half"></i></div><h4>Not ready for payment yet</h4>
+    <p>This application is still being processed. Follow it from My applications.</p>
+{% endif %}
+    <a class="btn btn-primary" href="{% url 'web:my-applications' %}">My applications</a>
+</div></div></div></section>
+{% endblock %}

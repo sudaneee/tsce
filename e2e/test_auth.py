@@ -14,7 +14,7 @@ def check(name, cond, detail=""):
 
 
 def login(page, email, pw, remember=True):
-    page.goto(f"{B}/pages/login.html"); page.wait_for_selector("#loginForm")
+    page.goto(f"{B}/account/login/"); page.wait_for_selector("#loginForm")
     page.fill("#loginEmail", email)
     page.fill("#loginPassword", pw)
     if not remember:
@@ -35,7 +35,8 @@ with sync_playwright() as p:
     check("portal menu says Portals when signed out", "Portals" in page.inner_text("#portalDrop button"))
 
     # 2. Login page: demo panel gone; wrong password shows the server message
-    page.goto(f"{B}/pages/login.html"); page.wait_for_selector("#loginForm")
+    page.goto(f"{B}/pages/login.html"); page.wait_for_url("**/account/login/"); page.wait_for_selector("#loginForm")
+    check("old login address redirects to the new page", page.url.endswith("/account/login/"))
     check("no demo accounts panel", page.locator(".demo-login, [data-demo]").count() == 0)
     login(page, "rabi@tsce.edu.ng", "wrong-password")
     page.wait_for_selector("#loginError .alert")
@@ -60,8 +61,9 @@ with sync_playwright() as p:
     check("staff changed password", True)
 
     # 6. Logout; signed-out portal redirects to login with ?next, which is honoured
-    page.evaluate("Auth.logout()"); page.wait_for_url("**/pages/login.html?out=1")
-    page.goto(f"{B}/pages/staff/payments.html"); page.wait_for_url("**/pages/login.html?**")
+    page.evaluate("Auth.logout()"); page.wait_for_url("**/account/login/?out=1")
+    check("signed out notice", "signed out" in page.inner_text("main"))
+    page.goto(f"{B}/pages/staff/payments.html"); page.wait_for_url("**/account/login/?**")
     check("signed-out portal redirects with next", "next=staff%2Fpayments.html" in page.url)
     page.fill("#loginEmail", "rabi@tsce.edu.ng"); page.fill("#loginPassword", "Staff-Pass-2027")
     page.click("#loginForm button[type=submit]"); page.wait_for_url("**/pages/staff/payments.html")
@@ -70,8 +72,8 @@ with sync_playwright() as p:
     # 7. Session dies mid-use → next API call (401) bounces to login
     ctx.clear_cookies()
     page.evaluate("API.post('auth/change-password', {}).catch(() => {})")
-    page.wait_for_url("**/pages/login.html?**")
-    check("401 on portal page redirects to login", "login.html" in page.url)
+    page.wait_for_url("**/account/login/?**")
+    check("401 on portal page redirects to login", "/account/login/" in page.url)
 
     # 8. Admin resets the student's password; student must change it
     login(page, "director@tsce.edu.ng", "Director-Pass-2026")
@@ -79,21 +81,21 @@ with sync_playwright() as p:
     check("admin sees Settings in menu", page.locator('.menu-list a[href="settings.html"]').count() == 1)
     temp = page.evaluate("API.post('staff/users/3/reset-password').then(r => r.temporaryPassword)")
     check("admin got a temporary password", temp and len(temp) == 10)
-    page.evaluate("Auth.logout()"); page.wait_for_url("**/login.html?out=1")
+    page.evaluate("Auth.logout()"); page.wait_for_url("**/account/login/?out=1")
     login(page, "amina@example.com", temp)
-    page.wait_for_url("**/pages/student/dashboard.html"); page.wait_for_selector("#fpcForm")
-    check("forced modal has no close button", page.locator(".modal:has(#fpcForm) .modal-close").count() == 0)
-    page.keyboard.press("Escape")
-    check("Escape does not dismiss it", page.is_visible("#fpcForm"))
-    page.fill("#fpc0", temp); page.fill("#fpc1", "Student-Pass-2027"); page.fill("#fpc2", "Student-Pass-2027")
-    page.click("#fpcSave"); page.wait_for_selector("#fpcForm", state="detached")
-    me = page.evaluate("API.get('auth/me').then(r => r.user)")
+    page.wait_for_url("**/account/password/"); page.wait_for_selector("#id_old_password")
+    check("forced to choose a new password", "choose a new password" in page.inner_text("main").lower())
+    page.goto(f"{B}/my-applications/"); page.wait_for_url("**/account/password/?next=*")
+    check("can't skip the password change", "/account/password/" in page.url)
+    page.fill("#id_old_password", temp); page.fill("#id_new_password1", "Student-Pass-2027"); page.fill("#id_new_password2", "Student-Pass-2027")
+    page.click("main button[type=submit]"); page.wait_for_url("**/my-applications/")
+    me = page.evaluate("fetch('/api/auth/me').then(r => r.json()).then(r => r.user)")
     check("mustChangePassword cleared", me["mustChangePassword"] is False and me["role"] == "student")
 
     # 9. Remember-me off → browser-session cookie
-    page.evaluate("Auth.logout(false)")
+    page.click("#maLogout"); page.wait_for_url("**/account/login/?out=1")
     login(page, "amina@example.com", "Student-Pass-2027", remember=False)
-    page.wait_for_url("**/pages/student/dashboard.html")
+    page.wait_for_url("**/my-applications/")
     sess = [c for c in ctx.cookies() if c["name"] == "sessionid"][0]
     check("remember-me off gives a browser-session cookie", sess["expires"] == -1, str(sess["expires"]))
     check("session cookie is httpOnly", sess["httpOnly"])

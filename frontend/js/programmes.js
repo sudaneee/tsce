@@ -70,7 +70,7 @@ const Programmes = (() => {
             size: "xl", bare: true,
             body: `<div class="pd-hero"><div class="flex between" style="align-items:flex-start"><span class="badge badge-dark no-dot" style="background:rgba(255,255,255,.14)">${p.category} · ${p.track}</span><button class="modal-close" data-close aria-label="Close" style="background:rgba(255,255,255,.12);color:#fff"><i class="fa-solid fa-xmark"></i></button></div>
                 <h2>${UI.esc(p.name)}</h2><p>${p.code} · ${p.weeks}-week professional programme</p></div>${body}`,
-            footer: `<button class="btn btn-ghost" data-close>Close</button><button class="btn btn-outline" id="pdShare"><i class="fa-solid fa-share-nodes"></i> Share</button><a class="btn btn-primary" href="${UI.url("pages/application.html?programme=" + p.id)}">Apply for this programme <i class="fa-solid fa-arrow-right"></i></a>`,
+            footer: `<button class="btn btn-ghost" data-close>Close</button><button class="btn btn-outline" id="pdShare"><i class="fa-solid fa-share-nodes"></i> Share</button><a class="btn btn-primary" href="${UI.url("apply/?programme=" + p.id)}">Apply for this programme <i class="fa-solid fa-arrow-right"></i></a>`,
             onOpen: (api) => { api.body.style.padding = "0"; setTimeout(() => UI.animateAll(api.el), 50); }
         });
         UI.$("#pdShare", m.el).onclick = () => UI.copy(location.origin + location.pathname.replace(/[^/]*$/, "") + `programmes.html?id=${p.id}`);

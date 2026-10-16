@@ -18,7 +18,7 @@ def verification_token(user: User) -> str:
 
 
 def send_verification_email(user: User) -> bool:
-    link = site_link(f"pages/verify-email.html?token={verification_token(user)}")
+    link = site_link(f"account/verify-email/?token={verification_token(user)}")
     hours = settings.EMAIL_VERIFICATION_MAX_AGE // 3600
     return send_email(
         "Verify your email — TSCE admissions portal",
@@ -33,7 +33,7 @@ def send_already_registered_email(user: User) -> bool:
     return send_email(
         "Your TSCE account",
         f"Dear {user.full_name},\n\nSomeone (hopefully you) tried to register with this email address, but an "
-        f"account already exists. Sign in here: {site_link('pages/login.html')}\n\n"
+        f"account already exists. Sign in here: {site_link('account/login/')}\n\n"
         "Forgot your password? Contact the TSCE admin office to reset it.",
         user.email,
     )

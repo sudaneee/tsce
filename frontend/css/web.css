@@ -1,0 +1,75 @@
+/* ==========================================================================
+   Server-rendered pages (Django templates, backend/apps/web).
+   Menus open without JavaScript: the portal menu is a <details>, the mobile
+   menu opens with #mobileNav (:target).
+   ========================================================================== */
+
+/* Portal dropdown */
+details.nav-drop > summary { list-style: none; cursor: pointer; }
+details.nav-drop > summary::-webkit-details-marker { display: none; }
+details.nav-drop[open] .nav-drop-menu { opacity: 1; visibility: visible; transform: none; }
+.nav-drop-menu form { margin: 0; }
+.nav-drop-menu .drop-btn { display: flex; gap: 12px; align-items: center; width: 100%; padding: 10px 12px; border: 0; border-radius: 10px;
+    background: none; font: inherit; font-weight: 600; color: var(--text); cursor: pointer; text-align: left; }
+.nav-drop-menu .drop-btn:hover { background: var(--primary-50); }
+.icon-tile.red { background: #FDECEE; color: var(--danger); }
+
+/* Mobile menu */
+a.nav-toggle { text-decoration: none; }
+.mobile-nav:target { visibility: visible; }
+.mobile-nav:target .mn-backdrop { opacity: 1; }
+.mobile-nav:target .mn-panel { transform: none; }
+a.mn-backdrop { display: block; }
+
+/* Messages under the header */
+.flash-wrap { padding-top: 18px; }
+
+/* Login portal switch as links */
+.role-switch a.role-btn { flex: 1; display: inline-flex; justify-content: center; align-items: center; gap: 8px; text-decoration: none; }
+
+/* Programme picker: radio cards */
+.prog-option { cursor: pointer; }
+.prog-option input { position: absolute; opacity: 0; pointer-events: none; }
+.prog-option:has(input:checked) { border-color: var(--primary); background: var(--primary-50); }
+.prog-option:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
+.prog-option { position: relative; }
+
+/* Option grid on register (two cards side by side) */
+.option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 520px) { .option-grid { grid-template-columns: 1fr; } }
+
+/* Applicant progress line (same as the portal's) */
+.lifecycle { display: flex; gap: 0; margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px; }
+.lc-step { flex: 1; min-width: 86px; text-align: center; position: relative; font-size: .72rem; font-weight: 600; color: var(--muted-2); }
+.lc-step::before { content: ""; position: absolute; top: 13px; left: -50%; right: 50%; height: 2px; background: var(--border); z-index: 0; }
+.lc-step:first-child::before { display: none; }
+.lc-step .c { width: 28px; height: 28px; border-radius: 50%; margin: 0 auto 6px; display: grid; place-items: center; background: #fff; border: 2px solid var(--border-strong); position: relative; z-index: 1; font-size: .65rem; }
+.lc-step.done { color: var(--text-2); }
+.lc-step.done .c { background: var(--success); border-color: var(--success); color: #fff; }
+.lc-step.done::before, .lc-step.current::before { background: var(--success); }
+.lc-step.current { color: var(--primary); }
+.lc-step.current .c { border-color: var(--primary); background: var(--primary); color: #fff; box-shadow: 0 0 0 4px rgba(24,70,214,.15); }
+.lc-step.bad .c { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+.avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--primary-50); color: var(--primary-dark); font-weight: 800; font-family: var(--font-head); }
+
+/* Done wizard steps link back */
+.wstep a { color: inherit; text-decoration: none; }
+.wstep a:hover strong { text-decoration: underline; }
+
+/* Printable receipt page */
+.receipt-page { background: var(--surface-2); }
+.receipt-sheet { max-width: 760px; margin: 32px auto; background: #fff; border: 1px solid var(--border); border-radius: 18px; padding: 28px 32px; }
+.receipt-actions { display: flex; justify-content: space-between; margin-bottom: 18px; }
+@media print {
+    .no-print { display: none !important; }
+    .receipt-page { background: #fff; }
+    .receipt-sheet { border: 0; margin: 0; padding: 0; max-width: none; }
+}
+
+/* Simple lists (same as the portal's) */
+.list { list-style: none; margin: 0; padding: 0; }
+.list-item { display: flex; gap: 14px; align-items: center; padding: 12px 0; }
+.list-item .grow { flex: 1; min-width: 0; }
+.list-item strong { display: block; font-size: .9rem; color: var(--text); }
+.list-item small { color: var(--muted); font-size: .8rem; }

@@ -150,7 +150,7 @@ class RegistrationTests(AuthTestCase):
     def link_token(self):
         from django.core import mail
         body = mail.outbox[-1].body
-        return body.split("verify-email.html?token=")[1].split()[0]
+        return body.split("account/verify-email/?token=")[1].split()[0]
 
     def test_register_sends_verification_and_blocks_login_until_verified(self):
         from django.core import mail
@@ -159,7 +159,7 @@ class RegistrationTests(AuthTestCase):
         user = User.objects.get()
         self.assertEqual((user.email, user.role, user.phone, user.email_verified), ("rabi.musa@example.com", "parent", "0803 123 4567", False))
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn("verify-email.html?token=", mail.outbox[0].body)
+        self.assertIn("account/verify-email/?token=", mail.outbox[0].body)
 
         res = self.login("rabi.musa@example.com")
         self.assertEqual((res.status_code, res.json()["code"]), (400, "email_unverified"))

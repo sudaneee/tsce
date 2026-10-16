@@ -1,0 +1,7 @@
+{# A labelled form field with its error. Use: include "web/partials/field.html" with f=form.firstName req=1 cls="span-2" hint="…" #}
+<div class="field{% if f.errors %} has-error{% endif %}{% if cls %} {{ cls }}{% endif %}">
+    <label for="{{ f.id_for_label }}">{{ f.label }}{% if req %} <span class="req">*</span>{% endif %}</label>
+    {{ f }}
+    {% if hint %}<span class="hint">{{ hint }}</span>{% endif %}
+    {% for e in f.errors %}<span class="field-error">{{ e }}</span>{% endfor %}
+</div>

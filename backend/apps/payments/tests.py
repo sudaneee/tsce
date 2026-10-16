@@ -172,7 +172,7 @@ class SinglePaymentFlowTests(PaymentFlowTestCase):
 
     def test_one_payment_including_the_application_fee_enrols(self):
         final, ref = self.checkout("success", PROG_FEE)
-        self.assertEqual(final["Location"], f"/pages/success.html?ref={ref}")
+        self.assertEqual(final["Location"], f"/payments/{ref}/")
         pay = Payment.objects.get(reference=ref)
         self.assertEqual((pay.amount, pay.fee, pay.discount), (55000, 50000, 0))
         self.assertIn("incl. ₦5,000 application fee", pay.description)
@@ -242,15 +242,15 @@ class SinglePaymentFlowTests(PaymentFlowTestCase):
 
     def test_declined_then_retry(self):
         final, ref = self.checkout("failed", PROG_FEE)
-        self.assertIn("/pages/payment.html?result=failed", final["Location"])
+        self.assertEqual(final["Location"], f"/payments/{ref}/")  # that page sends a failed payment back to the invoice
         self.assertEqual(Payment.objects.get(reference=ref).status, "FAILED")
         self.assertEqual(self.refresh().payment_status, "Failed")
         final, _ = self.checkout("success", PROG_FEE)
-        self.assertTrue(final["Location"].startswith("/pages/success.html"))
+        self.assertTrue(final["Location"].startswith("/payments/"))
 
     def test_abandoned_checkout_stays_pending(self):
         final, ref = self.checkout("cancel", PROG_FEE)
-        self.assertIn("result=pending", final["Location"])
+        self.assertEqual(final["Location"], f"/payments/{ref}/?check=1")
         self.assertEqual(Payment.objects.get(reference=ref).status, "PENDING")
 
     def test_callback_without_txnref_uses_only_this_browsers_session(self):
@@ -258,8 +258,8 @@ class SinglePaymentFlowTests(PaymentFlowTestCase):
         ref = res.json()["ref"]
         self.client.post(res.json()["checkoutUrl"], {"outcome": "success"}, **self.csrf())
         with on(OCT_1):
-            self.assertEqual(self.client.get("/api/payments/zainpay/callback")["Location"], f"/pages/success.html?ref={ref}")
-        self.assertIn("result=unknown", APIClient().get("/api/payments/zainpay/callback")["Location"])
+            self.assertEqual(self.client.get("/api/payments/zainpay/callback")["Location"], f"/payments/{ref}/")
+        self.assertEqual(APIClient().get("/api/payments/zainpay/callback")["Location"], "/my-applications/?payment=unknown")
 
     def test_seats_are_taken_by_payment_only(self):
         Programme.objects.filter(slug="fullstack").update(capacity=1)

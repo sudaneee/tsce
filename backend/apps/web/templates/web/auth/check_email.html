@@ -1,0 +1,12 @@
+{% extends "web/auth/base.html" %}
+{% block title %}Check your email{% endblock %}
+{% block box %}
+<div id="regRoot">
+<div class="empty mt-3"><div class="empty-icon"><i class="fa-solid fa-envelope-open-text"></i></div>
+    <h4>Check your email</h4>
+    <p>{% if resent %}If that account still needs verifying, we've sent a new link{% else %}We've sent a verification link{% endif %}{% if email %} to <b>{{ email }}</b>{% endif %}. Open it to confirm your email, then you can apply.</p>
+    <p class="small muted">Can't find it? Check your spam folder. The link is valid for 48 hours.</p>
+    <a class="btn btn-primary" href="{% url 'web:login' %}">Go to sign in</a>
+</div>
+</div>
+{% endblock %}

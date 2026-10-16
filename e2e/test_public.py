@@ -45,7 +45,7 @@ with sync_playwright() as p:
 
     page.goto(f"{B}/pages/application.html"); page.wait_for_selector("#wizardRoot .card")
     check("application requires an account", "Create an account to apply" in page.inner_text("#wizardRoot"))
-    page.click("#wizardRoot a.btn-primary"); page.wait_for_url("**/register.html")
+    page.click("#wizardRoot a.btn-primary"); page.wait_for_url("**/account/register/")
     check("register page reachable", page.locator("#regForm").count() == 1)
 
     page.goto(f"{B}/pages/contact.html"); page.wait_for_selector("#contactForm")

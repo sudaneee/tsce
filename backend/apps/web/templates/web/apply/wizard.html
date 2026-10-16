@@ -1,0 +1,156 @@
+{% extends "web/base.html" %}{% load web %}
+{% block title %}Online application{% endblock %}
+{% block content %}
+<section class="page-hero" style="padding:40px 0 32px"><div class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a><i class="fa-solid fa-chevron-right"></i><a href="/pages/admissions.html">Admissions</a><i class="fa-solid fa-chevron-right"></i><span>Application</span></nav>
+    <h1 style="font-size:clamp(1.7rem,3vw,2.4rem);margin-bottom:6px">Online application</h1>
+    <p class="muted mb-0">{{ cohort.name }} · takes about 5 minutes · your answers are kept as you go</p>
+</div></section>
+<section class="section" style="padding-top:36px"><div class="container" id="wizardRoot">
+<div class="wizard-wrap">
+    <aside class="wizard-steps" aria-label="Application progress">
+        <ol>{% for s in steps %}
+            <li class="wstep {{ s.state }}"{% if s.state == "active" %} aria-current="step"{% endif %}><span class="dot">{% if s.state == "done" %}<i class="fa-solid fa-check"></i>{% else %}{{ s.n }}{% endif %}</span><div>{% if s.state == "done" and step < 5 %}<a href="{% url 'web:apply-step' s.n %}"><strong>{{ s.title }}</strong></a>{% else %}<strong>{{ s.title }}</strong>{% endif %}<small>{{ s.sub }}</small></div></li>
+        {% endfor %}</ol>
+        <div class="wizard-progress"><div class="progress sm"><span style="width:{{ progress }}%"></span></div></div>
+    </aside>
+
+    {% if step == 5 %}
+    {# ---------------- 5. Admission (outcome) ---------------- #}
+    <div class="wizard-card">
+        <div class="wizard-head"><div><h2>{% if app.status == "Admitted" %}Admitted!{% else %}Application received{% endif %}</h2><p>{{ app.full_name }} · {{ app.programme.name }}</p></div><span class="badge badge-primary no-dot">Step 5 of 5</span></div>
+        <div class="wizard-body" id="admissionResult">
+            <div class="app-no mb-3"><div><small>Application Number</small><br><strong class="mono">{{ app.number }}</strong></div></div>
+            {% if app.status == "Admitted" %}
+            <div class="alert success mb-3"><i class="fa-solid fa-circle-check"></i><p><b>Congratulations — {{ app.full_name }} has been admitted</b> to {{ app.programme.name }} ({{ app.cohort.name }}). Pay the programme fee to secure the seat — seats are limited.</p></div>
+            <div class="fee-box">
+                <div class="fee-row"><span>Programme fee{% if opts.half %} (pay in full){% endif %}</span><span>{{ opts.full|naira }}</span></div>
+                {% if opts.half %}<div class="fee-row"><span>Or 50% now, balance before the programme ends</span><span>{{ opts.half|naira }}</span></div>{% endif %}
+                {% if opts.charge %}<div class="fee-row"><span>Zainpay transaction charge (per payment)</span><span>{{ opts.charge|naira }}</span></div>{% endif %}
+            </div>
+            {% else %}
+            <div class="alert warning"><i class="fa-solid fa-id-card"></i><p><b>Next step: visit TSCE with the original WAEC/NECO result</b> ({{ site.address }}). Admissions will verify it and approve the Excellence Award. You'll then be able to pay the programme fee from My applications.</p></div>
+            {% endif %}
+        </div>
+        <div class="wizard-foot">
+            <a class="btn btn-ghost" href="{% url 'web:my-applications' %}">My applications</a>
+            {% if app.status == "Admitted" %}<a class="btn btn-grad" id="payNowLink" href="{{ pay_url }}"><i class="fa-solid fa-lock"></i> Pay programme fee</a>{% endif %}
+        </div>
+    </div>
+
+    {% else %}
+    <form class="wizard-card" id="appForm" method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        <div class="wizard-head"><div><h2 id="wTitle">{{ title }}</h2><p id="wSub">{{ subtitle }}</p></div><span class="badge badge-primary no-dot" id="wStepNo">Step {{ step }} of 5</span></div>
+        <div class="wizard-body">
+            {% if form.non_field_errors %}<div class="alert danger mb-2"><i class="fa-solid fa-circle-exclamation"></i><p>{{ form.non_field_errors|join:" " }}</p></div>{% endif %}
+            {% if form.errors and step < 4 %}<div class="alert warning mb-2" role="alert"><i class="fa-solid fa-triangle-exclamation"></i><p>Please correct the highlighted fields.</p></div>{% endif %}
+
+            {% if step == 1 %}
+            <div class="form-grid cols-3">
+                {% include "web/partials/field.html" with f=form.firstName req=1 %}
+                {% include "web/partials/field.html" with f=form.middleName %}
+                {% include "web/partials/field.html" with f=form.lastName req=1 %}
+                {% include "web/partials/field.html" with f=form.gender req=1 %}
+                {% include "web/partials/field.html" with f=form.dob req=1 %}
+                {% include "web/partials/field.html" with f=form.phone req=1 %}
+                {% if parent %}{% include "web/partials/field.html" with f=form.email cls="span-2" hint="Your child's own email, if they have one. Receipts and updates always go to your account email." %}
+                {% else %}<div class="field span-2"><label>Email address</label><input class="input" value="{{ user.email }}" disabled><span class="hint">Applications use your account email.</span></div>{% endif %}
+                {% include "web/partials/field.html" with f=form.state req=1 %}
+                {% include "web/partials/field.html" with f=form.address req=1 cls="span-2" %}
+                {% include "web/partials/field.html" with f=form.lga req=1 %}
+            </div>
+
+            {% elif step == 2 %}
+            <div class="form-grid">
+                {% include "web/partials/field.html" with f=form.qualification req=1 %}
+                {% include "web/partials/field.html" with f=form.gradYear req=1 %}
+                {% include "web/partials/field.html" with f=form.institution req=1 cls="span-2" %}
+                {% include "web/partials/field.html" with f=form.waecStatus req=1 %}
+                <div></div>
+                {% include "web/partials/field.html" with f=form.waecYear hint="Required if your result is available." %}
+                {% include "web/partials/field.html" with f=form.numAs hint="Required if your result is available." %}
+                <div class="field span-2{% if form.resultFile.errors %} has-error{% endif %}">
+                    <label for="a_file">Upload result <span class="muted small">(optional — speeds up Excellence Award review)</span></label>
+                    {{ form.resultFile }}
+                    <span class="hint">PDF, JPG or PNG · max 5 MB{% if saved.resultFileLabel %} · already uploaded: <b>{{ saved.resultFileLabel }}</b> (choose a file only to replace it){% endif %}</span>
+                    {% for e in form.resultFile.errors %}<span class="field-error">{{ e }}</span>{% endfor %}
+                </div>
+                <div class="span-2 alert"><i class="fa-solid fa-award"></i><p><b>Excellence Award:</b> WAEC/NECO from {{ site.excellence_min_waec_year }} to date with {{ site.excellence_min_as }} A's or more qualifies for {{ site.excellence_pct }}% off the programme fee, after the original result is verified at TSCE.</p></div>
+            </div>
+
+            {% elif step == 3 %}
+            <div class="field mb-2{% if form.programmeId.errors %} has-error{% endif %}"><label>Programme <span class="req">*</span></label>
+                <div class="prog-select" id="progPicker" role="radiogroup" aria-label="Programme">
+                {% for c in programmes %}
+                    <label class="prog-option{% if c.full %} disabled{% endif %}" style="--pc:{{ c.p.color }}">
+                        <input type="radio" name="programmeId" value="{{ c.p.slug }}" {% if c.checked %}checked{% endif %} {% if c.full %}disabled{% endif %}>
+                        <span class="icon-tile"><i class="fa-solid {{ c.p.icon }}"></i></span>
+                        <span><strong>{{ c.p.name }}</strong><small>{{ c.p.weeks }} weeks · {% if c.full %}Full{% else %}{{ c.left }} seat{{ c.left|pluralize }} left{% endif %}</small></span>
+                        <span class="po-fee">{{ c.p.fee|naira }}</span>
+                    </label>
+                {% endfor %}
+                </div>
+                {% for e in form.programmeId.errors %}<span class="field-error">{{ e }}</span>{% endfor %}
+            </div>
+            <div class="form-grid mt-2">
+                {% include "web/partials/field.html" with f=form.schedule req=1 %}
+                <div class="field"><label>Intake</label><input class="input" value="{{ cohort.name }}" disabled></div>
+            </div>
+
+            {% elif step == 4 %}
+            {% if error %}<div class="alert danger mb-2" role="alert"><i class="fa-solid fa-circle-exclamation"></i><p>{{ error }}{% if duplicate %} <a href="{% url 'web:my-applications' %}">Open My applications →</a>{% endif %}</p></div>{% endif %}
+            <div class="form-section-title">Available discounts</div>
+            <div class="stack" id="discountList">
+                <div class="discount-card {% if early_bird %}eligible applied{% else %}ineligible{% endif %}"><div class="pct-pill">{{ settings.early_bird_pct }}%</div><div style="flex:1"><div class="flex between" style="align-items:flex-start"><h4>Early Bird Discount</h4><span class="badge badge-{% if early_bird %}success{% else %}neutral{% endif %}">{% if early_bird %}Applied{% else %}Closed{% endif %}</span></div>
+                    <p>Programme fee paid before {{ cohort.early_bird_deadline|longdate|default:"the early-bird deadline" }}.</p></div></div>
+                <div class="discount-card {% if eligible %}eligible{% else %}ineligible{% endif %}"><div class="pct-pill">{{ settings.excellence_pct }}%</div><div style="flex:1"><div class="flex between" style="align-items:flex-start"><h4>Excellence Award</h4><span class="badge badge-{% if eligible %}success{% else %}danger{% endif %}">{% if eligible %}Eligible{% else %}Not eligible{% endif %}</span></div>
+                    <p>WAEC/NECO {{ settings.excellence_min_waec_year }}–date with {{ settings.excellence_min_as }}+ A's, verified in person at TSCE. It replaces the early bird (discounts don't stack).</p>
+                    {% if not eligible %}<p class="mt-1" style="color:var(--text-2)">{% if d.waecStatus != "Available" %}No WAEC/NECO result entered.{% else %}Entered: {{ d.waecYear }} with {{ d.numAs }} A's.{% endif %}</p>{% endif %}
+                </div></div>
+                <div class="field{% if form.awardRequest.errors %} has-error{% endif %}">
+                    {% for r in form.awardRequest %}{% if r.data.value == "excellence" %}{% if eligible %}<label class="check" style="font-size:.88rem">{{ r.tag }} Request the Excellence Award (admission after in-person verification)</label>{% endif %}{% else %}<label class="check" style="font-size:.88rem">{{ r.tag }} No award — admit {% if parent %}my child{% else %}me{% endif %} straight away</label>{% endif %}{% endfor %}
+                    {% for e in form.awardRequest.errors %}<span class="field-error">{{ e }}</span>{% endfor %}
+                </div>
+            </div>
+
+            <div class="form-section-title mt-3">Fee calculation</div>
+            <div id="feeCalc"><div class="fee-box"><div class="fee-head"><strong style="font-family:var(--font-head)">After admission: programme fee</strong><span class="badge badge-primary no-dot">{{ cohort.name }}</span></div>
+                <div class="fee-row"><span>{{ d.programmeId.name }}</span><span>{{ fees.fee|naira }}</span></div>
+                {% if fees.discount %}<div class="fee-row"><span>Early Bird Discount ({{ fees.pct }}%)</span><span class="neg">−{{ fees.discount|naira }}</span></div>{% endif %}
+                {% if fees.app_fee %}<div class="fee-row"><span>Application fee</span><span>{{ fees.app_fee|naira }}</span></div>{% endif %}
+                <div class="fee-row total"><span>Total{% if fees.discount %} if paid now{% endif %}</span><span>{{ fees.total|naira }}</span></div>
+                {% if fees.half %}<div class="fee-row"><span>Or in two installments: 50% now</span><span>{{ fees.half|naira }}</span></div>{% endif %}
+                {% if fees.charge %}<div class="fee-row"><span>Zainpay transaction charge (per payment)</span><span>{{ fees.charge|naira }}</span></div>{% endif %}
+            </div>
+            <p class="hint mt-1"><i class="fa-solid fa-circle-info"></i> Nothing to pay to apply. Without an award request {% if parent %}your child is{% else %}you're{% endif %} admitted as soon as you submit, then pay the programme fee to secure the seat{% if fees.half %} — in full, or 50% now and the balance before the programme ends{% endif %}.</p></div>
+
+            <div class="form-section-title mt-3">Your application</div>
+            <div class="review-grid" id="reviewGrid">
+                <div><small>Full name</small><strong>{{ d.firstName }} {{ d.middleName }} {{ d.lastName }}</strong></div>
+                <div><small>Email</small><strong>{% if parent %}{{ d.email|default:"—" }}{% else %}{{ account_email }}{% endif %}</strong></div>
+                <div><small>Phone</small><strong>{{ d.phone }}</strong></div>
+                <div><small>Gender · DOB</small><strong>{{ d.gender }} · {{ d.dob|shortdate }}</strong></div>
+                <div><small>State · LGA</small><strong>{{ d.state }} · {{ d.lga }}</strong></div>
+                <div><small>Qualification</small><strong>{{ d.qualification }} — {{ d.institution }}</strong></div>
+                <div><small>WAEC/NECO</small><strong>{% if d.waecStatus == "Available" %}{{ d.waecYear }} · {{ d.numAs }} A's{% if file_label %} · result attached{% endif %}{% else %}{{ d.waecStatus }}{% endif %}</strong></div>
+                <div><small>Programme</small><strong>{{ d.programmeId.name }}</strong></div>
+                <div><small>Schedule</small><strong>{{ d.schedule }}</strong></div>
+                <div><small>Intake</small><strong>{{ cohort.name }}</strong></div>
+            </div>
+            <p class="small mt-1"><a href="{% url 'web:apply-step' 1 %}">Edit personal</a> · <a href="{% url 'web:apply-step' 2 %}">Edit education</a> · <a href="{% url 'web:apply-step' 3 %}">Edit programme</a></p>
+
+            <div class="form-section-title mt-3">Declaration</div>
+            <div class="field{% if form.declare.errors %} has-error{% endif %}"><label class="check">{{ form.declare }} I confirm the information provided is accurate and I agree to the TSCE admission terms.</label>{% for e in form.declare.errors %}<span class="field-error">{{ e }}</span>{% endfor %}</div>
+            {% endif %}
+        </div>
+        <div class="wizard-foot">
+            {% if step > 1 %}<button type="submit" name="nav" value="back" class="btn btn-ghost" id="prevBtn" formnovalidate><i class="fa-solid fa-arrow-left"></i> Back</button>{% else %}<span></span>{% endif %}
+            {% if step < 4 %}<button type="submit" name="nav" value="next" class="btn btn-primary" id="nextBtn">Continue <i class="fa-solid fa-arrow-right"></i></button>
+            {% else %}<button type="submit" name="nav" value="submit" class="btn btn-grad" id="submitBtn"><i class="fa-solid fa-paper-plane"></i> Submit application</button>{% endif %}
+        </div>
+    </form>
+    {% endif %}
+</div>
+</div></section>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% load web %}<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}TSCE{% endblock %} — TSCE</title>
+    <meta name="description" content="{% block description %}{{ site.institution_name }}{% endblock %}">
+    <meta name="theme-color" content="#0B1D55">
+    {% block head_extra %}{% endblock %}
+    <link rel="icon" href="/assets/logo/favicon.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="/css/main.css?v={{ asset_v }}">
+    <link rel="stylesheet" href="/css/responsive.css?v={{ asset_v }}">
+    <link rel="stylesheet" href="/css/web.css?v={{ asset_v }}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<a class="skip-link" href="#main">Skip to content</a>
+{% block header %}
+<div class="announce-bar" role="region" aria-label="Announcement"><div class="container">
+    <span class="pill">{% if early_bird %}Early bird{% else %}Enrolling{% endif %}</span>
+    <span><strong>{{ flyer.campaign }}</strong> <span class="hide-sm">{% if cohort %}— classes start {{ cohort.start_date|longdate }}{% endif %}{% if early_bird %} · {{ site.early_bird_pct }}% off when you pay before {{ cohort.early_bird_deadline|longdate }}{% endif %}</span></span>
+    <a href="/apply/">Apply now →</a>
+</div></div>
+<header class="site-header" id="siteHeader"><div class="container nav">
+    {% include "web/partials/brand.html" %}
+    <nav aria-label="Main navigation"><ul class="nav-links">{% for href, text, icon in nav %}<li><a href="{{ href }}">{{ text }}</a></li>{% endfor %}</ul></nav>
+    <div class="nav-actions">
+        <details class="nav-drop" id="portalDrop">
+            <summary class="btn btn-ghost btn-sm nav-drop-btn"><i class="fa-regular fa-circle-user"></i> <span class="hide-sm">{% if user.is_authenticated %}My account{% else %}Portal{% endif %}</span> <i class="fa-solid fa-chevron-down" style="font-size:.7rem"></i></summary>
+            <ul class="nav-drop-menu">
+                {% if user.is_authenticated %}
+                <li><a href="{{ home_url }}"><span class="icon-tile green"><i class="fa-solid fa-arrow-right-to-bracket"></i></span><span>Continue as {{ first_name }}<small>{{ user.email }}</small></span></a></li>
+                <li><form method="post" action="{% url 'web:logout' %}">{% csrf_token %}<button type="submit" class="drop-btn"><span class="icon-tile red"><i class="fa-solid fa-right-from-bracket"></i></span><span>Sign out</span></button></form></li>
+                {% else %}
+                <li><a href="{% url 'web:login' %}"><span class="icon-tile"><i class="fa-solid fa-user-graduate"></i></span><span>Student Portal<small>Applications, payments & results</small></span></a></li>
+                <li><a href="{% url 'web:login' %}?role=staff"><span class="icon-tile navy"><i class="fa-solid fa-briefcase"></i></span><span>Staff Portal<small>Admissions, finance & academics</small></span></a></li>
+                {% endif %}
+                <li><a href="/pages/verify.html"><span class="icon-tile green"><i class="fa-solid fa-shield-halved"></i></span><span>Verify Certificate<small>Check a TSCE certificate</small></span></a></li>
+            </ul>
+        </details>
+        <a class="btn btn-primary btn-sm btn-apply-desktop" href="/apply/">Apply Now <i class="fa-solid fa-arrow-right"></i></a>
+        <a class="nav-toggle" href="#mobileNav" aria-label="Open menu"><i class="fa-solid fa-bars"></i></a>
+    </div>
+</div></header>
+<div class="mobile-nav" id="mobileNav"><a class="mn-backdrop" href="#" aria-label="Close menu"></a><div class="mn-panel" role="dialog" aria-label="Menu">
+    <div class="mn-head">{% include "web/partials/brand.html" %}<a class="modal-close" href="#" aria-label="Close menu"><i class="fa-solid fa-xmark"></i></a></div>
+    <ul class="mn-links">{% for href, text, icon in nav %}<li><a href="{{ href }}"><i class="fa-solid {{ icon }}"></i>{{ text }}</a></li>{% endfor %}
+        {% if user.is_authenticated %}<li><a href="{{ home_url }}"><i class="fa-solid fa-user-graduate"></i>My account</a></li>
+        {% else %}<li><a href="{% url 'web:login' %}"><i class="fa-solid fa-user-graduate"></i>Student Portal</a></li><li><a href="{% url 'web:login' %}?role=staff"><i class="fa-solid fa-briefcase"></i>Staff Portal</a></li>{% endif %}</ul>
+    <a class="btn btn-primary btn-lg btn-block" href="/apply/">Apply Now</a>
+    <div class="mt-3 small muted">{% for p in site.phones %}<div><i class="fa-solid fa-phone"></i> <a href="tel:{{ p|cut:' ' }}">{{ p }}</a></div>{% endfor %}</div>
+</div></div>
+{% endblock %}
+
+<main id="main">
+{% if messages %}<div class="container flash-wrap">{% for m in messages %}<div class="alert {% if m.tags == 'error' %}danger{% elif m.tags == 'warning' %}warning{% elif m.tags == 'success' %}success{% endif %} mb-2" role="status"><i class="fa-solid {% if m.tags == 'success' %}fa-circle-check{% elif m.tags == 'error' %}fa-circle-xmark{% else %}fa-circle-info{% endif %}"></i><p>{{ m }}</p></div>{% endfor %}</div>{% endif %}
+{% block content %}{% endblock %}
+</main>
+
+{% block footer %}
+<footer class="site-footer"><div class="container">
+    <div class="footer-grid">
+        <div>{% include "web/partials/brand.html" %}<p class="mt-2" style="max-width:300px">Practical, career-focused digital skills training for the next generation of technology professionals in Northern Nigeria and beyond.</p>
+            <ul class="f-contact mt-2"><li><i class="fa-solid fa-location-dot"></i><span>{{ site.address }}</span></li></ul></div>
+        <div><h5>TSCE</h5><ul><li><a href="/pages/about.html">About</a></li><li><a href="/pages/programmes.html">Programmes</a></li><li><a href="/pages/admissions.html">Admissions</a></li><li><a href="/pages/news.html">News &amp; Events</a></li></ul></div>
+        <div><h5>Students</h5><ul><li><a href="/my-applications/">My applications</a></li><li><a href="/apply/">Apply</a></li><li><a href="/pages/verify.html">Verify a certificate</a></li></ul></div>
+        <div><h5>Resources</h5><ul><li><a href="/pages/news.html">News</a></li><li><a href="/index.html#faq">FAQs</a></li><li><a href="/pages/contact.html">Contact</a></li></ul></div>
+        <div><h5>Connect</h5><ul class="f-contact">{% for p in site.phones %}<li><i class="fa-solid fa-phone"></i><a href="tel:{{ p|cut:' ' }}">{{ p }}</a></li>{% endfor %}{% if site.website %}<li><i class="fa-solid fa-globe"></i><span>{{ site.website }}</span></li>{% endif %}</ul>
+            <div class="socials mt-2">{% for icon, label in socials %}<a href="#" aria-label="{{ label }}" title="{{ label }}"><i class="fa-brands {{ icon }}"></i></a>{% endfor %}</div></div>
+    </div>
+    <div class="footer-bottom"><span>© {% now "Y" %} {{ site.institution_name }}. All rights reserved.</span><span class="motto">{% for m in flyer.motto %}{{ m }}{% if not forloop.last %}<span>|</span>{% endif %}{% endfor %}</span></div>
+</div></footer>
+{% endblock %}
+</body>
+</html>

@@ -25,4 +25,7 @@ for n, (first, last, email, slug) in enumerate([("Aisha", "Garba", "aisha@exampl
         cohort=cohort, schedule=prog.schedules[0], application_fee=5000, fee=prog.fee, amount_payable=prog.fee + 5000,
         status="Admitted")
     ApplicationEvent.objects.create(application=app, text="Application submitted online")
+# Applications above were inserted directly: move the number counter past them.
+from apps.core.models import Sequence  # noqa: E402
+Sequence.objects.update_or_create(name="app", defaults={"value": Application.objects.count()})
 print("e2e setup done")
