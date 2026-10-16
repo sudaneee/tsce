@@ -31,8 +31,11 @@ def flyer() -> dict:
 @lru_cache(maxsize=1)
 def asset_version() -> str:
     """Changes whenever a stylesheet or script changes (they are deployed together)."""
-    files = [*settings.FRONTEND_DIR.glob("css/*.css"), *settings.FRONTEND_DIR.glob("js/site.js")]
-    return str(int(max((f.stat().st_mtime for f in files), default=0)))
+    try:
+        files = [*settings.FRONTEND_DIR.glob("css/*.css"), *settings.FRONTEND_DIR.glob("js/site.js")]
+        return str(int(max((f.stat().st_mtime for f in files), default=0)))
+    except OSError:  # never let a cache-buster take a page down
+        return "1"
 
 
 def home_for(user) -> str:
