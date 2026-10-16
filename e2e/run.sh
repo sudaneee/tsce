@@ -25,7 +25,7 @@ stop_server() {
     [ -n "${SERVER_PID:-}" ] && kill "$SERVER_PID" 2>/dev/null
     # Windows: make sure the Python child is gone too.
     command -v powershell >/dev/null && powershell -NoProfile -Command \
-        "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { \$_.CommandLine -like '*runserver $PORT*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }" >/dev/null 2>&1
+        "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { \$_.CommandLine -like '*server.py $PORT*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }" >/dev/null 2>&1
     SERVER_PID=""
 }
 trap stop_server EXIT
@@ -38,7 +38,8 @@ run_suite() {
     (cd "$REPO/backend" && "$PY" manage.py migrate -v 0) || return 1
     # Executed as one script (piping into `shell` runs it line by line, which breaks on loops).
     (cd "$REPO/backend" && "$PY" manage.py shell -c "exec(open('../e2e/setup_$name.py', encoding='utf-8').read())" 2>&1 | tee "$WORK/setup.log" | grep -q "setup done")         || { echo "setup failed:"; cat "$WORK/setup.log"; return 1; }
-    (cd "$REPO/backend" && exec "$PY" manage.py runserver "$PORT" --noreload > "$WORK/server.log" 2>&1) &
+    # "Today" is pinned (e2e/server.py) so the admissions calendar doesn't depend on the real date.
+    (cd "$REPO/backend" && exec "$PY" ../e2e/server.py "$PORT" > "$WORK/server.log" 2>&1) &
     SERVER_PID=$!
     for _ in $(seq 1 30); do curl -s -o /dev/null "$E2E_BASE/api/health" && break; sleep 1; done
     "$TPY" "${E2E_SCRIPT:-$REPO/e2e/test_$name.py}"

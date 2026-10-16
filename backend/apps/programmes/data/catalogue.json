@@ -429,38 +429,44 @@
     {
       "id": "it-essentials",
       "code": "TSCE-ITE",
-      "name": "IT Essentials: Computer Hardware Basics",
+      "name": "IT Essentials and Digital Literacy",
       "weeks": 6,
       "fee": 45000,
-      "track": "Hardware",
+      "track": "Digital Literacy",
       "icon": "fa-desktop",
       "color": "#0891B2",
       "colorBg": "#E6FBFE",
       "capacity": 35,
-      "overview": "An entry-level programme covering computer basics, hardware, operating systems and everyday IT support skills — the perfect starting point in tech.",
+      "overview": "An entry-level programme for complete beginners: computer basics and hardware, Windows, the internet and email, and the Microsoft Office package — Word, Excel and PowerPoint — plus everyday troubleshooting. The perfect starting point for school, office work and a career in tech.",
       "outcomes": [
-        "Understand computer hardware and software basics",
-        "Install and configure operating systems",
-        "Perform basic troubleshooting",
-        "Support users with everyday IT problems"
+        "Use a computer confidently, and understand its hardware and software",
+        "Manage files and settings in Windows",
+        "Create professional documents in Microsoft Word",
+        "Build spreadsheets with formulas and charts in Microsoft Excel",
+        "Design and deliver presentations in Microsoft PowerPoint",
+        "Use the internet, email and online tools safely, and fix common computer problems"
       ],
       "modules": [
-        "Introduction to Computers",
-        "Hardware Components",
-        "Operating Systems",
-        "Networking Basics",
-        "Troubleshooting Fundamentals",
-        "IT Support Practicals"
+        "Introduction to Computers & Digital Literacy",
+        "Computer Hardware Components",
+        "Windows & File Management",
+        "Microsoft Word",
+        "Microsoft Excel",
+        "Microsoft PowerPoint",
+        "Internet, Email (Outlook) & Online Safety",
+        "Basic Troubleshooting & IT Support Practicals"
       ],
       "audience": [
         "Complete beginners",
         "Secondary school leavers",
-        "Office staff"
+        "Office staff and civil servants",
+        "Small business owners"
       ],
       "careers": [
-        "IT Support Assistant",
-        "Help Desk Officer",
-        "Computer Operator"
+        "Computer Operator",
+        "Office Administrator / Secretary",
+        "Data Entry Clerk",
+        "IT Support Assistant"
       ],
       "requirements": [
         "No prior experience required"
