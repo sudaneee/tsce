@@ -71,7 +71,10 @@ def staff_required(view=None, *, admin=False):
 def shell(request, active, title, subtitle, **ctx):
     """Context every staff page needs: sidebar badges, the bell, who is signed in."""
     mine = Notification.objects.filter(recipient=request.user)
-    return {"active": active, "page_title": title, "page_sub": subtitle, "counts": sidebar_counts(),
+    from apps.comms.models import SupportTicket
+
+    counts = {**sidebar_counts(), "tickets": SupportTicket.objects.filter(status=SupportTicket.Status.OPEN).count()}
+    return {"active": active, "page_title": title, "page_sub": subtitle, "counts": counts,
             "bell": list(mine[:8]), "unread": mine.filter(read=False).count(),
             "is_admin": request.user.role == User.Role.ADMIN, **ctx}
 
@@ -458,3 +461,42 @@ def search(request):
                                       | Q(application__number__icontains=q))[:20]
     return render(request, "web/staff/search.html", shell(
         request, "search", "Search", "Applications, students and payments", q=q, apps=apps, students=students, pays=pays))
+
+
+# ---------------------------------------------------------------------------
+# Support tickets from students
+# ---------------------------------------------------------------------------
+@staff_required
+def tickets(request):
+    from apps.comms.models import SupportTicket
+
+    status = request.GET.get("status") or "Open"
+    qs = SupportTicket.objects.select_related("student").order_by("-created_at")
+    counts = {s: qs.filter(status=s).count() for s in ("Open", "Resolved")}
+    if status != "All":
+        qs = qs.filter(status=status)
+    page, query = paginate(request, qs)
+    return render(request, "web/staff/tickets.html", shell(
+        request, "support", "Support", "Student help desk", page=page, query=query, status=status, counts=counts))
+
+
+@staff_required
+def ticket_detail(request, pk):
+    from apps.comms.models import SupportTicket
+    from apps.comms.services import notify
+
+    t = get_object_or_404(SupportTicket.objects.select_related("student__user", "student__guardian"), pk=pk)
+    note = NoteForm(request.POST or None)
+    if request.method == "POST":
+        reply = (request.POST.get("reply") or "").strip()[:4000]
+        if not reply:
+            messages.error(request, "Write a reply first.")
+        else:
+            t.reply, t.replied_by, t.replied_at = reply, request.user, timezone.now()
+            t.status = SupportTicket.Status.RESOLVED if request.POST.get("resolve") else SupportTicket.Status.OPEN
+            t.save()
+            notify(t.student.account, f"Reply to your ticket {t.number}", f"{t.subject}: {reply[:300]}",
+                   Notification.Type.SUPPORT, link=f"student/{t.student.pk}/support/", email=True)
+            messages.success(request, f"Reply sent to {t.student.full_name}.")
+            return redirect("web:staff-ticket", pk=t.pk)
+    return render(request, "web/staff/ticket.html", shell(request, "support", "Support", "Student help desk", t=t, form=note))

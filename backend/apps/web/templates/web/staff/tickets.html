@@ -1,0 +1,25 @@
+{% extends "web/staff/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Support</h2><p>Questions from students (and parents) through the student portal. Replies are emailed and shown in their portal.</p></div></div>
+<div class="panel"><div class="panel-head">
+    <div class="tabs" role="tablist">
+        <a class="tab{% if status == 'Open' %} active{% endif %}" href="?status=Open">Open ({{ counts.Open }})</a>
+        <a class="tab{% if status == 'Resolved' %} active{% endif %}" href="?status=Resolved">Resolved ({{ counts.Resolved }})</a>
+        <a class="tab{% if status == 'All' %} active{% endif %}" href="?status=All">All</a></div></div>
+<div id="ticketTable">
+{% if page.object_list %}
+<div class="table-wrap"><table class="table">
+    <thead><tr><th>Ticket</th><th>Student</th><th>Subject</th><th>Category</th><th>Status</th><th>Sent</th></tr></thead>
+    <tbody>{% for t in page.object_list %}<tr>
+        <td><a class="ref" href="{% url 'web:staff-ticket' t.pk %}">{{ t.number }}</a></td>
+        <td><div class="person"><span class="avatar sm">{{ t.student.full_name|initials }}</span><div><strong>{{ t.student.full_name }}</strong><small class="mono">{{ t.student.student_no }}</small></div></div></td>
+        <td>{{ t.subject }}{% if t.priority == "High" %} <span class="badge badge-danger no-dot">High</span>{% endif %}</td>
+        <td><span class="small">{{ t.category }}</span></td>
+        <td><span class="badge badge-{% if t.status == 'Open' %}warning{% else %}success{% endif %}">{{ t.status }}</span></td>
+        <td><span class="small">{{ t.created_at|datetime_short }}</span></td>
+    </tr>{% endfor %}</tbody>
+</table></div>
+{% include "web/staff/pager.html" %}
+{% else %}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-headset"></i></div><h4>No tickets here</h4></div>{% endif %}
+</div></div>
+{% endblock %}

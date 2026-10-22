@@ -43,6 +43,7 @@
     {% if n.part_paid %}<div class="alert warning mb-2"><i class="fa-solid fa-scale-balanced"></i><p><b>Balance due: {{ a.balance|naira }}</b>{% if a.balance_due_date %} by {{ a.balance_due_date|longdate }}{% endif %} ({{ a.amount_paid|naira }} of {{ a.amount_payable|naira }} paid). Results and the certificate are released once it's paid.</p></div>{% endif %}
     <div class="flex flex-wrap">
         {% if n.part_paid %}<a class="btn btn-grad" href="{% url 'web:pay' a.number %}"><i class="fa-solid fa-lock"></i> Pay balance · {{ a.balance|add:charge|naira }}</a>{% endif %}
+        {% if n.student_pk %}<a class="btn btn-primary" href="{% url 'web:student-dashboard' n.student_pk %}"><i class="fa-solid fa-user-graduate"></i> Student portal</a>{% endif %}
         {% if n.receipt %}<a class="btn btn-outline" href="{% url 'web:payment' n.receipt.reference %}?fresh=0"><i class="fa-solid fa-receipt"></i> Confirmation &amp; receipt</a>{% endif %}
     </div>
     {% elif n.kind == "rejected" %}

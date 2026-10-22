@@ -1,6 +1,6 @@
 from django.urls import path, re_path
 
-from .views import applicant, apply, auth, public, staff
+from .views import applicant, apply, auth, public, staff, student
 
 app_name = "web"
 
@@ -47,10 +47,24 @@ urlpatterns = [
     path("staff/notifications/", staff.notifications, name="staff-notifications"),
     path("staff/notifications/<int:pk>/", staff.notification_open, name="staff-notification"),
     path("staff/search/", staff.search, name="staff-search"),
+    path("staff/support/", staff.tickets, name="staff-tickets"),
+    path("staff/support/<int:pk>/", staff.ticket_detail, name="staff-ticket"),
+
+    path("student/", student.home, name="student"),
+    path("student/<int:pk>/", student.dashboard, name="student-dashboard"),
+    path("student/<int:pk>/programme/", student.programme, name="student-programme"),
+    path("student/<int:pk>/attendance/", student.attendance, name="student-attendance"),
+    path("student/<int:pk>/results/", student.results, name="student-results"),
+    path("student/<int:pk>/certificate/", student.certificate, name="student-certificate"),
+    path("student/<int:pk>/payments/", student.payments, name="student-payments"),
+    path("student/<int:pk>/announcements/", student.announcements, name="student-announcements"),
+    path("student/<int:pk>/support/", student.support, name="student-support"),
+    path("student/<int:pk>/profile/", student.profile, name="student-profile"),
 
     # Old addresses of these pages
     re_path(r"^pages/(?P<page>login|register|verify-email|application|my-applications|payment|success)\.html$",
             applicant.legacy, name="legacy"),
+    re_path(r"^pages/student/[a-z]+\.html$", applicant.legacy_student, name="legacy-student"),
     re_path(r"^pages/staff/(?P<page>dashboard|applications|scholarships|payments|staff|settings)\.html$",
             applicant.legacy_staff, name="legacy-staff"),
 ]

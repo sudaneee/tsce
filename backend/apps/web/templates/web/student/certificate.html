@@ -1,0 +1,16 @@
+{% extends "web/student/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Certificate</h2><p>Your certificate of completion for {{ programme.name }}.</p></div></div>
+{% if cert.state == "Issued" %}
+<div class="card card-pad" id="certIssued" style="border-color:rgba(18,161,80,.35);background:linear-gradient(135deg,#F3FCF6,#fff)"><div class="flex" style="align-items:flex-start"><span class="icon-tile green" style="width:56px;height:56px;font-size:1.4rem"><i class="fa-solid fa-certificate"></i></span><div style="flex:1">
+    <div class="flex between flex-wrap"><h3 class="mb-0">Certificate issued</h3><span class="badge badge-success">Valid</span></div>
+    <div class="kv mt-2"><div><small>Certificate No.</small><strong class="mono">{{ cert.certificate.number }}</strong></div><div><small>Issued</small><strong>{{ cert.certificate.issued_at|shortdate }}</strong></div><div><small>Holder</small><strong>{{ student.full_name }}</strong></div><div><small>Programme</small><strong>{{ programme.name }}</strong></div></div>
+    <p class="small muted mt-2 mb-0">Anyone can check it at <a href="/pages/verify.html?no={{ cert.certificate.number|urlencode }}">{{ site.website|default:"tsce.com.ng" }}/pages/verify.html</a>. Collect the printed certificate from the TSCE admin office.</p>
+</div></div></div>
+{% elif cert.state == "Revoked" %}
+<div class="alert danger"><i class="fa-solid fa-ban"></i><p>Your certificate has been revoked. Please contact the TSCE admin office.</p></div>
+{% else %}
+<div class="panel"><div class="panel-head"><div><h3><i class="fa-solid fa-list-check"></i>Requirements</h3><p>{% if cert.state == "Eligible" %}You meet every requirement — your certificate will be issued by the TSCE admin office.{% else %}Your certificate is issued once all of these are met.{% endif %}</p></div><span class="badge badge-{% if cert.state == 'Eligible' %}success{% else %}warning{% endif %}">{{ cert.state }}</span></div>
+    <ul class="list" id="certChecks">{% for c in cert.checks %}<li class="list-item" style="padding:14px 22px"><span class="icon-tile {% if c.ok %}green{% else %}red{% endif %}"><i class="fa-solid {% if c.ok %}fa-check{% else %}fa-xmark{% endif %}"></i></span><div class="grow"><strong>{{ c.label }}</strong></div><span class="small muted">{{ c.value }}</span></li>{% endfor %}</ul></div>
+{% endif %}
+{% endblock %}

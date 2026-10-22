@@ -35,6 +35,7 @@
             <span class="sb-link sb-soon" aria-disabled="true"><i class="fa-solid fa-certificate"></i><span>Certificates</span><b class="sb-count">soon</b></span>
             <div class="sb-label">Management</div>
             {% if is_admin %}<a class="sb-link{% if active == 'team' %} active{% endif %}" href="{% url 'web:staff-team' %}"><i class="fa-solid fa-id-badge"></i><span>Staff</span></a>{% endif %}
+            <a class="sb-link{% if active == 'support' %} active{% endif %}" href="{% url 'web:staff-tickets' %}"><i class="fa-solid fa-headset"></i><span>Support</span>{% if counts.tickets %}<b class="sb-count">{{ counts.tickets }}</b>{% endif %}</a>
             <a class="sb-link{% if active == 'notifications' %} active{% endif %}" href="{% url 'web:staff-notifications' %}"><i class="fa-solid fa-bell"></i><span>Notifications</span>{% if unread %}<b class="sb-count">{{ unread }}</b>{% endif %}</a>
             <span class="sb-link sb-soon" aria-disabled="true"><i class="fa-solid fa-chart-pie"></i><span>Reports</span><b class="sb-count">soon</b></span>
             {% if is_admin %}<a class="sb-link{% if active == 'settings' %} active{% endif %}" href="{% url 'web:staff-settings' %}"><i class="fa-solid fa-gear"></i><span>Settings</span></a>{% endif %}

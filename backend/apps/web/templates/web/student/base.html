@@ -1,0 +1,82 @@
+{% load web %}<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Student · {{ page_title }} — TSCE</title>
+    <meta name="theme-color" content="#0B1D55">
+    <link rel="icon" href="/assets/logo/favicon.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="/css/main.css?v={{ asset_v }}">
+    <link rel="stylesheet" href="/css/dashboard.css?v={{ asset_v }}">
+    <link rel="stylesheet" href="/css/responsive.css?v={{ asset_v }}">
+    <link rel="stylesheet" href="/css/web.css?v={{ asset_v }}">
+</head>
+<body class="staff-portal student-portal">
+<a class="skip-link" href="#view">Skip to content</a>
+<div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Sidebar">
+        <div class="sb-head">{% include "web/partials/brand.html" %}<a class="sb-close" href="#" aria-label="Close menu"><i class="fa-solid fa-xmark"></i></a></div>
+        <div class="sb-portal"><span class="dot"></span><div class="txt"><b>Student Portal</b>{{ student.student_no }}</div></div>
+        <nav class="sb-nav" aria-label="Portal navigation">
+            <div class="sb-label">Main</div>
+            <a class="sb-link{% if active == 'dashboard' %} active{% endif %}" href="{% url 'web:student-dashboard' student.pk %}"><i class="fa-solid fa-gauge-high"></i><span>Dashboard</span></a>
+            <a class="sb-link{% if active == 'profile' %} active{% endif %}" href="{% url 'web:student-profile' student.pk %}"><i class="fa-solid fa-user"></i><span>Profile</span></a>
+            <a class="sb-link{% if active == 'programme' %} active{% endif %}" href="{% url 'web:student-programme' student.pk %}"><i class="fa-solid fa-layer-group"></i><span>My Programme</span></a>
+            <div class="sb-label">Academics</div>
+            <a class="sb-link{% if active == 'attendance' %} active{% endif %}" href="{% url 'web:student-attendance' student.pk %}"><i class="fa-solid fa-calendar-check"></i><span>Attendance</span></a>
+            <a class="sb-link{% if active == 'results' %} active{% endif %}" href="{% url 'web:student-results' student.pk %}"><i class="fa-solid fa-chart-simple"></i><span>Results</span></a>
+            <a class="sb-link{% if active == 'certificate' %} active{% endif %}" href="{% url 'web:student-certificate' student.pk %}"><i class="fa-solid fa-certificate"></i><span>Certificate</span></a>
+            <div class="sb-label">Account</div>
+            <a class="sb-link{% if active == 'payments' %} active{% endif %}" href="{% url 'web:student-payments' student.pk %}"><i class="fa-solid fa-wallet"></i><span>Payments</span>{% if app.payment_status == "Part Paid" %}<b class="sb-count">!</b>{% endif %}</a>
+            <a class="sb-link{% if active == 'announcements' %} active{% endif %}" href="{% url 'web:student-announcements' student.pk %}"><i class="fa-solid fa-bullhorn"></i><span>Announcements</span></a>
+            <a class="sb-link{% if active == 'support' %} active{% endif %}" href="{% url 'web:student-support' student.pk %}"><i class="fa-solid fa-headset"></i><span>Support</span></a>
+            {% if is_parent %}<div class="sb-label">Family</div>
+            <a class="sb-link" href="{% url 'web:my-applications' %}"><i class="fa-solid fa-people-roof"></i><span>My applications</span></a>
+            {% for s in siblings %}<a class="sb-link" href="{% url 'web:student-dashboard' s.pk %}"><i class="fa-solid fa-child"></i><span>{{ s.first_name }}</span></a>{% endfor %}{% endif %}
+        </nav>
+        <div class="sb-foot"><div class="sb-user"><span class="avatar sm">{{ student.full_name|initials }}</span><div class="meta"><strong>{{ student.full_name }}</strong><span>{% if is_parent %}viewed by {{ user.full_name }}{% else %}student{% endif %}</span></div>
+            <form method="post" action="{% url 'web:logout' %}">{% csrf_token %}<button aria-label="Log out" title="Log out"><i class="fa-solid fa-arrow-right-from-bracket"></i></button></form></div></div>
+    </aside>
+    <a class="sb-backdrop" href="#" aria-label="Close menu"></a>
+
+    <div class="app-main">
+        <header class="topbar" id="topbar">
+            <a class="tb-btn tb-menu" href="#sidebar" aria-label="Open menu"><i class="fa-solid fa-bars"></i></a>
+            <div class="tb-title"><h1>{{ page_title }}</h1><p>{{ page_sub }}</p></div>
+            <span style="margin-left:auto"></span>
+            <div class="tb-actions">
+                <details class="dropdown" id="bellDD"><summary class="tb-btn" id="bellBtn" aria-label="Notifications"><i class="fa-regular fa-bell"></i>{% if unread %}<span class="dotcount" id="bellCount">{% if unread > 9 %}9+{% else %}{{ unread }}{% endif %}</span>{% endif %}</summary>
+                    <div class="dropdown-menu" role="menu"><div class="dm-head"><h4>Notifications</h4></div>
+                        <div class="dm-list" id="bellList">{% for n in bell %}
+                            <div class="notif{% if not n.read %} unread{% endif %}"><span class="icon-tile"><i class="fa-solid fa-bell"></i></span><div><strong>{{ n.title }}</strong><p>{{ n.body|truncatechars:110 }}</p><small>{{ n.created_at|datetime_short }}</small></div></div>
+                        {% empty %}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-bell-slash"></i></div><h4>No notifications</h4></div>{% endfor %}</div></div>
+                </details>
+                <details class="dropdown" id="userDD"><summary class="tb-user" id="userBtn" aria-label="Account menu"><span class="avatar sm">{{ user.full_name|initials }}</span><span class="meta-txt"><strong>{{ first_name }}</strong><small>{{ user.role }}</small></span><i class="fa-solid fa-chevron-down small muted meta-txt"></i></summary>
+                    <div class="dropdown-menu" style="width:240px" role="menu"><div class="menu-list">
+                        <a href="{% url 'web:student-profile' student.pk %}"><i class="fa-regular fa-user"></i>Profile</a>
+                        <a href="{% url 'web:my-applications' %}"><i class="fa-solid fa-file-signature"></i>My applications</a>
+                        <a href="/index.html" target="_blank" rel="noopener"><i class="fa-solid fa-globe"></i>View public website</a>
+                        <a href="{% url 'web:password' %}?next={{ request.get_full_path|urlencode }}"><i class="fa-solid fa-key"></i>Change password</a>
+                        <form method="post" action="{% url 'web:logout' %}">{% csrf_token %}<button id="umLogout"><i class="fa-solid fa-arrow-right-from-bracket"></i>Log out</button></form></div></div>
+                </details>
+            </div>
+        </header>
+        <main class="view" id="view" tabindex="-1">
+            {% if messages %}{% for m in messages %}<div class="alert {% if m.tags == 'error' %}danger{% elif m.tags == 'warning' %}warning{% elif m.tags == 'success' %}success{% endif %} mb-2 toast-msg" role="status"><i class="fa-solid {% if m.tags == 'success' %}fa-circle-check{% else %}fa-circle-info{% endif %}"></i><p>{{ m }}</p></div>{% endfor %}{% endif %}
+            {% if app.payment_status == "Part Paid" and active != "payments" %}<div class="alert warning mb-3"><i class="fa-solid fa-scale-balanced"></i><p><b>Programme fee balance: {{ app.balance|naira }}</b>{% if app.balance_due_date %} — due by {{ app.balance_due_date|longdate }}{% endif %}. Results and the certificate are released once it's paid. <a href="{% url 'web:pay' app.number %}">Pay balance</a></p></div>{% endif %}
+            {% block view %}{% endblock %}
+        </main>
+    </div>
+</div>
+<nav class="bottom-nav" aria-label="Quick navigation">
+    <a href="{% url 'web:student-dashboard' student.pk %}" class="{% if active == 'dashboard' %}active{% endif %}"><i class="fa-solid fa-house"></i>Home</a>
+    <a href="{% url 'web:student-programme' student.pk %}" class="{% if active == 'programme' %}active{% endif %}"><i class="fa-solid fa-layer-group"></i>Programme</a>
+    <a href="{% url 'web:student-results' student.pk %}" class="{% if active == 'results' %}active{% endif %}"><i class="fa-solid fa-chart-simple"></i>Results</a>
+    <a href="{% url 'web:student-payments' student.pk %}" class="{% if active == 'payments' %}active{% endif %}"><i class="fa-solid fa-wallet"></i>Payments</a>
+    <a href="#sidebar"><i class="fa-solid fa-grip"></i>More</a>
+</nav>
+</body>
+</html>

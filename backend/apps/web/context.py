@@ -43,6 +43,8 @@ def home_for(user) -> str:
     """Where a signed-in account belongs."""
     if user.role in ("staff", "admin"):
         return "/staff/"
+    if user.role == "student":
+        return "/student/"
     return "/my-applications/"
 
 

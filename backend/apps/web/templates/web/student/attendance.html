@@ -1,0 +1,18 @@
+{% extends "web/student/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Attendance</h2><p>Your class attendance record. A minimum of {{ minimum }}% is required for certification.</p></div></div>
+{% if att.total %}
+<div class="kpis">
+    <div class="kpi"><div class="kpi-top"><p class="label">Attendance rate</p><span class="icon-tile {% if att.rate >= minimum %}green{% else %}red{% endif %}"><i class="fa-solid fa-percent"></i></span></div><div class="value">{{ att.rate }}%</div><span class="trend flat">{% if att.rate >= minimum %}On track{% else %}Below the {{ minimum }}% minimum{% endif %}</span></div>
+    <div class="kpi"><div class="kpi-top"><p class="label">Present</p><span class="icon-tile green"><i class="fa-solid fa-check"></i></span></div><div class="value">{{ att.present }}</div></div>
+    <div class="kpi"><div class="kpi-top"><p class="label">Late</p><span class="icon-tile gold"><i class="fa-solid fa-clock"></i></span></div><div class="value">{{ att.late }}</div></div>
+    <div class="kpi"><div class="kpi-top"><p class="label">Absent</p><span class="icon-tile red"><i class="fa-solid fa-xmark"></i></span></div><div class="value">{{ att.absent }}</div></div>
+</div>
+<div class="panel"><div class="table-wrap"><table class="table">
+    <thead><tr><th>Date</th><th>Module</th><th>Status</th></tr></thead>
+    <tbody>{% for r in att.records reversed %}<tr><td>{{ r.session.date|date:"D" }}, {{ r.session.date|shortdate }}</td><td><span class="small">{{ r.session.module.title|default:"—" }}</span></td><td><span class="badge badge-{% if r.status == 'Present' %}success{% elif r.status == 'Late' %}warning{% else %}danger{% endif %}">{{ r.status }}</span></td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% else %}
+<div class="panel"><div class="empty"><div class="empty-icon"><i class="fa-solid fa-calendar-check"></i></div><h4>No attendance records yet</h4><p>Attendance is recorded once classes begin on {{ enrollment.start_date|longdate }}.</p></div></div>
+{% endif %}
+{% endblock %}

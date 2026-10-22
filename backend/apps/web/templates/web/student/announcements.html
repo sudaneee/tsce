@@ -1,0 +1,8 @@
+{% extends "web/student/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Announcements</h2><p>News and notices from TSCE.</p></div></div>
+<div class="panel">
+{% for a in items %}<div class="ann{% if a.pinned %} pinned{% endif %}"><span class="icon-tile{% if a.pinned %} gold{% endif %}"><i class="fa-solid fa-bullhorn"></i></span><div><h4>{% if a.pinned %}<i class="fa-solid fa-thumbtack" style="color:var(--gold);font-size:.8rem;margin-right:6px"></i>{% endif %}{{ a.title }}</h4><p style="white-space:pre-line">{{ a.body }}</p><div class="meta"><span><i class="fa-regular fa-calendar"></i> {{ a.published_at|default:a.created_at|shortdate }}</span>{% if a.author_label %}<span><i class="fa-regular fa-user"></i> {{ a.author_label }}</span>{% endif %}{% if a.tag %}<span class="badge badge-neutral no-dot">{{ a.tag }}</span>{% endif %}</div></div></div>
+{% empty %}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-bullhorn"></i></div><h4>No announcements yet</h4></div>{% endfor %}
+</div>
+{% endblock %}

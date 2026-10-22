@@ -1,0 +1,23 @@
+{% extends "web/student/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Payments</h2><p>Programme fee, installments and receipts.</p></div>
+    {% if app.payment_status == "Part Paid" %}<div class="actions"><a class="btn btn-grad" href="{% url 'web:pay' app.number %}"><i class="fa-solid fa-lock"></i> Pay balance · {{ app.balance|add:charge|naira }}</a></div>{% endif %}</div>
+<div class="kpis">
+    <div class="kpi"><div class="kpi-top"><p class="label">Programme fee</p><span class="icon-tile"><i class="fa-solid fa-file-invoice"></i></span></div><div class="value">{{ app.amount_payable|naira }}</div><span class="trend flat">{{ app.fee|naira }}{% if app.discount_amount %} − {{ app.get_discount_type_display }}{% endif %}{% if app_fee %} + application fee{% endif %}</span></div>
+    <div class="kpi"><div class="kpi-top"><p class="label">Paid</p><span class="icon-tile green"><i class="fa-solid fa-circle-check"></i></span></div><div class="value">{{ app.amount_paid|naira }}</div></div>
+    <div class="kpi"><div class="kpi-top"><p class="label">Balance</p><span class="icon-tile {% if app.balance %}gold{% else %}green{% endif %}"><i class="fa-solid fa-scale-balanced"></i></span></div><div class="value">{{ app.balance|naira }}</div><span class="trend flat">{% if app.balance and app.balance_due_date %}Due {{ app.balance_due_date|shortdate }}{% elif not app.balance %}Fees cleared{% endif %}</span></div>
+</div>
+<div class="panel"><div class="panel-head"><h3><i class="fa-solid fa-receipt"></i>Receipts</h3></div>
+{% if rows %}<div class="table-wrap"><table class="table">
+    <thead><tr><th>Reference</th><th>For</th><th class="num">Amount</th><th>Status</th><th>Date</th><th></th></tr></thead>
+    <tbody>{% for p in rows %}<tr>
+        <td class="mono small">{{ p.reference }}</td>
+        <td><span class="small">{% if p.purpose == "application_fee" %}Application fee{% else %}Programme fee{% endif %}{% if p.installment == 1 %} · 1st installment{% elif p.installment == 2 %} · balance{% endif %}{% if p.kind == "refund" %} · refund{% endif %}</span></td>
+        <td class="num"><b>{{ p.amount|naira }}</b></td>
+        <td><span class="badge badge-{{ p.status|badge_tone }}">{{ p.status }}</span></td>
+        <td><span class="small">{{ p.verified_at|default:p.created_at|datetime_short }}</span></td>
+        <td>{% if p.status == "SUCCESS" or p.status == "REFUNDED" %}<a class="btn btn-xs btn-soft" href="{% url 'web:receipt' p.reference %}">Receipt</a>{% endif %}</td>
+    </tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-receipt"></i></div><h4>No payments yet</h4></div>{% endif %}
+</div>
+{% endblock %}

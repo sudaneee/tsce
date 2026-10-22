@@ -1,0 +1,21 @@
+{% extends "web/student/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Results</h2><p>Published assessment scores for each module.</p></div></div>
+{% if res.withheld %}
+<div class="panel" id="resultsWithheld"><div class="empty"><div class="empty-icon"><i class="fa-solid fa-lock"></i></div><h4>Results are withheld until the programme fee is paid in full</h4>
+    <p>The balance of {{ app.balance|naira }} is due{% if app.balance_due_date %} by {{ app.balance_due_date|longdate }}{% endif %}. Your results appear here as soon as it's paid.</p>
+    <a class="btn btn-grad" href="{% url 'web:pay' app.number %}"><i class="fa-solid fa-lock"></i> Pay balance · {{ app.balance|add:charge|naira }}</a></div></div>
+{% elif res.records %}
+<div class="kpis">
+    <div class="kpi"><div class="kpi-top"><p class="label">Assessment average</p><span class="icon-tile"><i class="fa-solid fa-chart-line"></i></span></div><div class="value">{{ res.average }}%</div><span class="trend flat">Grade {{ res.grade }}</span></div>
+    <div class="kpi"><div class="kpi-top"><p class="label">Assessments</p><span class="icon-tile cyan"><i class="fa-solid fa-list-check"></i></span></div><div class="value">{{ res.records|length }}</div></div>
+    <div class="kpi"><div class="kpi-top"><p class="label">Best score</p><span class="icon-tile green"><i class="fa-solid fa-trophy"></i></span></div><div class="value">{{ res.best.score }}%</div><span class="trend flat">{{ res.best.module.title }}</span></div>
+</div>
+<div class="panel"><div class="table-wrap"><table class="table" id="resultsTable">
+    <thead><tr><th>Module</th><th>Assessment</th><th>Date</th><th class="num">Score</th><th>Grade</th><th>Remark</th></tr></thead>
+    <tbody>{% for r in res.records %}<tr><td><strong>{{ r.module.title }}</strong></td><td><span class="small">{{ r.type }}</span></td><td><span class="small">{{ r.assessed_on|shortdate }}</span></td><td class="num"><b>{{ r.score }}%</b></td><td><span class="badge badge-{% if r.grade == 'A' %}success{% elif r.grade == 'B' %}primary{% elif r.grade == 'C' %}info{% elif r.grade == 'D' %}warning{% else %}danger{% endif %} no-dot">{{ r.grade }}</span></td><td><span class="small muted">{{ r.remark }}</span></td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% else %}
+<div class="panel"><div class="empty"><div class="empty-icon"><i class="fa-solid fa-chart-simple"></i></div><h4>No results yet</h4><p>Scores appear here once your instructors publish them.</p></div></div>
+{% endif %}
+{% endblock %}

@@ -98,6 +98,7 @@ def next_step(app: Application) -> dict:
     if app.status == Application.Status.ENROLLED:
         enrollment = getattr(app, "enrollment", None)
         return {"kind": "enrolled", "student_no": enrollment.student.student_no if enrollment else "",
+                "student_pk": enrollment.student_id if enrollment else None,
                 "part_paid": app.payment_status == Application.PaymentStatus.PART_PAID,
                 "receipt": latest_receipt(app)}
     return {"kind": "processing"}

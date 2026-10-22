@@ -188,3 +188,8 @@ def legacy_staff(request, page):
               "payments": "web:staff-payments", "staff": "web:staff-team", "settings": "web:staff-settings"}[page]
     keep = {k: q[k] for k in ("status",) if q.get(k)}
     return redirect(reverse(target) + (f"?{urlencode(keep)}" if keep else ""))
+
+
+def legacy_student(request):
+    """The old JS student pages → the student portal."""
+    return redirect("/student/")

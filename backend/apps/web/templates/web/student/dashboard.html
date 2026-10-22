@@ -1,0 +1,26 @@
+{% extends "web/student/base.html" %}{% load web %}
+{% block view %}
+<div class="welcome"><div style="position:relative;z-index:1"><span class="badge badge-primary no-dot">{% now "j F Y" %}</span><h2>Welcome, {{ student.first_name }}</h2>
+    <p>{{ programme.name }} · {{ enrollment.cohort.name }} · <span class="mono">{{ student.student_no }}</span>.
+    {% if started %}Classes run until {{ enrollment.end_date|longdate }}.{% else %}Classes begin <b>{{ enrollment.start_date|longdate }}</b>{% if days_to_start > 0 %} — in {{ days_to_start }} day{{ days_to_start|pluralize }}{% endif %}.{% endif %}</p></div>
+    <div class="actions"><a class="btn btn-primary" href="{% url 'web:student-programme' student.pk %}"><i class="fa-solid fa-layer-group"></i> My programme</a><a class="btn btn-outline" href="{% url 'web:student-results' student.pk %}"><i class="fa-solid fa-chart-simple"></i> Results</a></div></div>
+<div class="kpis">
+    <a class="kpi" href="{% url 'web:student-programme' student.pk %}" style="text-decoration:none"><div class="kpi-top"><p class="label">Programme progress</p><span class="icon-tile"><i class="fa-solid fa-layer-group"></i></span></div><div class="value">{{ enrollment.progress }}%</div><div class="progress sm mt-1"><span style="width:{{ enrollment.progress }}%"></span></div></a>
+    <a class="kpi" href="{% url 'web:student-attendance' student.pk %}" style="text-decoration:none"><div class="kpi-top"><p class="label">Attendance</p><span class="icon-tile {% if att.total and att.rate < 75 %}red{% else %}green{% endif %}"><i class="fa-solid fa-calendar-check"></i></span></div><div class="value">{% if att.total %}{{ att.rate }}%{% else %}—{% endif %}</div><span class="trend flat">{% if att.total %}{{ att.present|add:att.late }} of {{ att.total }} classes{% else %}Not recorded yet{% endif %}</span></a>
+    <a class="kpi" href="{% url 'web:student-results' student.pk %}" style="text-decoration:none"><div class="kpi-top"><p class="label">Assessment average</p><span class="icon-tile cyan"><i class="fa-solid fa-chart-line"></i></span></div><div class="value">{% if res.withheld %}<i class="fa-solid fa-lock small"></i>{% elif res.records %}{{ res.average }}%{% else %}—{% endif %}</div><span class="trend flat">{% if res.withheld %}Released when fees are paid{% elif res.records %}Grade {{ res.grade }}{% else %}No results yet{% endif %}</span></a>
+    <a class="kpi" href="{% url 'web:student-payments' student.pk %}" style="text-decoration:none"><div class="kpi-top"><p class="label">Programme fee</p><span class="icon-tile gold"><i class="fa-solid fa-wallet"></i></span></div><div class="value">{% if app.payment_status == "Part Paid" %}{{ app.balance|naira }}{% else %}Paid{% endif %}</div><span class="trend flat">{% if app.payment_status == "Part Paid" %}Balance due{% else %}{{ app.amount_paid|naira }} paid{% endif %}</span></a>
+    <a class="kpi" href="{% url 'web:student-certificate' student.pk %}" style="text-decoration:none"><div class="kpi-top"><p class="label">Certificate</p><span class="icon-tile grad"><i class="fa-solid fa-certificate"></i></span></div><div class="value" style="font-size:1.3rem">{{ cert.state }}</div><span class="trend flat">{% if cert.state == "Issued" %}{{ cert.certificate.number }}{% else %}{{ cert.checks|length }} requirements{% endif %}</span></a>
+</div>
+<div class="dash-grid cols-12">
+    <div class="panel span-7"><div class="panel-head"><h3><i class="fa-solid fa-bullhorn"></i>Latest announcements</h3><a class="btn btn-sm btn-soft" href="{% url 'web:student-announcements' student.pk %}">View all</a></div>
+        {% if news %}<div>{% for a in news %}<div class="ann{% if a.pinned %} pinned{% endif %}"><span class="icon-tile{% if a.pinned %} gold{% endif %}"><i class="fa-solid fa-bullhorn"></i></span><div><h4>{{ a.title }}</h4><p>{{ a.body|truncatechars:200 }}</p><div class="meta"><span><i class="fa-regular fa-calendar"></i> {{ a.published_at|default:a.created_at|shortdate }}</span></div></div></div>{% endfor %}</div>
+        {% else %}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-bullhorn"></i></div><h4>No announcements yet</h4></div>{% endif %}</div>
+    <div class="panel span-5"><div class="panel-head"><h3><i class="fa-regular fa-calendar"></i>Your class</h3></div><div class="panel-body"><div class="kv">
+        <div class="full"><small>Programme</small><strong>{{ programme.name }}</strong></div>
+        <div><small>Schedule</small><strong>{{ enrollment.schedule }}</strong></div><div><small>Duration</small><strong>{{ programme.weeks }} weeks</strong></div>
+        <div><small>Starts</small><strong>{{ enrollment.start_date|shortdate }}</strong></div><div><small>Ends</small><strong>{{ enrollment.end_date|shortdate }}</strong></div>
+        {% if programme.instructor %}<div class="full"><small>Lead instructor</small><strong>{{ programme.instructor.full_name }}</strong></div>{% endif %}
+        <div class="full"><small>Venue</small><strong>{{ site.address }}</strong></div>
+    </div></div></div>
+</div>
+{% endblock %}

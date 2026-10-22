@@ -223,7 +223,10 @@ Old `pages/*.html` addresses of converted pages redirect to the new ones.
   Django at the same addresses (/, /index.html, /pages/*.html) with the same design. Programmes, seats, fees,
   discount percentages and the calendar come from the database/Settings (no hard-coded dates). `js/site.js` only
   animates (reveal, counters, countdown, FAQ, instant catalogue filter); programme/news pop-ups open by #link.
-- **Step 4 — student portal** (Phase 7) built as templates from the start.
+- **Step 4 — student portal** ✔ (Phase 7): `/student/<id>/` dashboard, programme (module progress), attendance,
+  results (withheld until fees are cleared), certificate (requirements / issued + verify link), payments & receipts,
+  announcements, support tickets (staff answer at `/staff/support/`), profile. Parents open each child's portal;
+  rules live in `academics/services.py`. Data entry for attendance/results/certificates is Phase 8.
 - **Step 5 — clean-up**: delete the demo engine (`data.js`, `storage.js`, demo code in the JS files) and the API
   endpoints no page uses any more (the Zainpay webhook/callback stay).
 

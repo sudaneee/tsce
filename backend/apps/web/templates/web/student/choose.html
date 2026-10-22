@@ -1,0 +1,11 @@
+{% extends "web/base.html" %}{% load web %}
+{% block title %}Student portal{% endblock %}
+{% block content %}
+<section class="page-hero" style="padding:40px 0 32px"><div class="container">
+    <nav class="crumbs" aria-label="Breadcrumb"><a href="/index.html">Home</a><i class="fa-solid fa-chevron-right"></i><span>Student portal</span></nav>
+    <h1 style="font-size:clamp(1.7rem,3vw,2.4rem);margin-bottom:6px">Student portal</h1><p class="muted mb-0">Choose a child to open their portal.</p>
+</div></section>
+<section class="section" style="padding-top:36px"><div class="container"><div class="grid grid-3" id="kids">
+    {% for s in kids %}<a class="card card-pad card-hover" href="{% url 'web:student-dashboard' s.pk %}" style="color:inherit;text-decoration:none"><div class="flex"><span class="avatar">{{ s.full_name|initials }}</span><div><strong>{{ s.full_name }}</strong><div class="small muted mono">{{ s.student_no }}</div></div></div></a>{% endfor %}
+</div></div></section>
+{% endblock %}

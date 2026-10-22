@@ -1,0 +1,21 @@
+{% extends "web/student/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>Support</h2><p>Ask the TSCE team about classes, payments, your certificate or the portal. Replies appear here and are emailed to {{ user.email }}.</p></div></div>
+<div class="dash-grid cols-12">
+    <div class="panel span-5" style="align-self:start"><div class="panel-head"><h3><i class="fa-solid fa-pen"></i>New ticket</h3></div><div class="panel-body">
+        <form method="post" id="ticketForm" novalidate>{% csrf_token %}
+            {% include "web/partials/field.html" with f=form.category cls="mb-2" %}
+            {% include "web/partials/field.html" with f=form.subject req=1 cls="mb-2" %}
+            {% include "web/partials/field.html" with f=form.message req=1 cls="mb-2" %}
+            <button class="btn btn-primary btn-block">Send</button>
+        </form></div></div>
+    <div class="panel span-7"><div class="panel-head"><h3><i class="fa-solid fa-headset"></i>Your tickets</h3></div>
+        {% for t in tickets %}<div class="ticket" style="padding:16px 22px;border-bottom:1px solid var(--border)">
+            <div class="flex between flex-wrap"><strong>{{ t.subject }}</strong><span class="badge badge-{% if t.status == 'Open' %}warning{% else %}success{% endif %}">{{ t.status }}</span></div>
+            <div class="small muted mb-1"><span class="mono">{{ t.number }}</span> · {{ t.category }} · {{ t.created_at|datetime_short }}</div>
+            <p class="small mb-1" style="white-space:pre-line">{{ t.message }}</p>
+            {% if t.reply %}<div class="alert mb-0"><i class="fa-solid fa-reply"></i><p><b>TSCE replied</b> ({{ t.replied_at|datetime_short }}):<br><span style="white-space:pre-line">{{ t.reply }}</span></p></div>{% endif %}
+        </div>{% empty %}<div class="empty"><div class="empty-icon"><i class="fa-solid fa-headset"></i></div><h4>No tickets yet</h4></div>{% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "web/student/base.html" %}{% load web %}
+{% block view %}
+<div class="view-head"><div><h2>{{ programme.name }}</h2><p>{{ programme.code }} · {{ programme.weeks }} weeks · {{ enrollment.schedule }}</p></div></div>
+<div class="dash-grid cols-12">
+    <div class="panel span-8"><div class="panel-head"><div><h3><i class="fa-solid fa-book-open"></i>Modules</h3><p>Overall progress {{ enrollment.progress }}% — updated by your instructors</p></div></div><div class="panel-body">
+        {% for m, pct in modules %}<div class="module mb-2"><div class="flex between small mb-1"><b>{{ forloop.counter|stringformat:"02d" }} · {{ m.title }}</b><span class="muted">{% if pct == 100 %}Completed{% elif pct %}{{ pct }}%{% else %}Not started{% endif %}</span></div><div class="progress{% if pct == 100 %} green{% endif %}"><span style="width:{{ pct }}%"></span></div></div>
+        {% empty %}<p class="muted">The curriculum for this programme hasn't been published yet.</p>{% endfor %}
+    </div></div>
+    <div class="span-4" style="display:grid;gap:20px;align-content:start">
+        <div class="panel"><div class="panel-head"><h3><i class="fa-solid fa-bullseye"></i>Learning outcomes</h3></div><div class="panel-body"><ul class="checklist">{% for o in programme.outcomes %}<li>{{ o }}</li>{% endfor %}</ul></div></div>
+        <div class="panel"><div class="panel-head"><h3><i class="fa-solid fa-briefcase"></i>Career opportunities</h3></div><div class="panel-body"><div class="tag-list">{% for c in programme.careers %}<span class="chip">{{ c }}</span>{% endfor %}</div></div></div>
+    </div>
+</div>
+{% endblock %}
