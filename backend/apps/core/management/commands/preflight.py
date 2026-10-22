@@ -66,7 +66,7 @@ class Command(BaseCommand):
         origin = f"{site.scheme}://{site.netloc}"
         self.add(S, origin in getattr(settings, "CSRF_TRUSTED_ORIGINS", []), f"{origin} is a trusted CSRF origin",
                  f"Add {origin} to DJANGO_CSRF_TRUSTED_ORIGINS")
-        self.add(S, settings.REST_FRAMEWORK.get("NUM_PROXIES") == 1, "NUM_PROXIES=1 (real client IPs behind nginx)",
+        self.add(S, settings.NUM_PROXIES == 1, "NUM_PROXIES=1 (real client IPs behind nginx)",
                  "Set NUM_PROXIES=1 so rate limits see real client IPs, not nginx", WARN)
         self.add(S, bool(getattr(settings, "SESSION_COOKIE_SECURE", False)), "Secure cookies on", "SESSION_COOKIE_SECURE is off")
 

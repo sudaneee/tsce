@@ -258,3 +258,42 @@ class NotificationAndSearchTests(StaffTestCase):
         self.assertContains(page, self.app.number)
         self.assertContains(self.client.get("/staff/search/?q=000077"), "TSCE-ZP-20261001-000077")
         self.assertContains(self.client.get("/staff/search/?q=u"), "at least 2 characters")
+
+
+class FileAndDeactivationTests(StaffTestCase):
+    def test_uploaded_waec_result_is_served_to_staff_only(self):
+        from django.core.files.base import ContentFile
+
+        self.app.waec_file.save("waec.pdf", ContentFile(b"%PDF-1.4\n% test\n"))
+        res = self.client.get(f"/staff/waec/{self.app.number}/")
+        self.assertEqual((res.status_code, res["Content-Type"]), (200, "application/pdf"))
+        self.assertIn("WAEC-TSCE-APP-2026-00001.pdf", res["Content-Disposition"])
+        self.assertContains(self.client.get(f"/staff/applications/{self.app.number}/"), "Open uploaded result")
+        self.client.force_login(self.parent)
+        self.assertEqual(self.client.get(f"/staff/waec/{self.app.number}/").status_code, 302)
+
+    def test_deactivated_staff_cant_sign_in(self):
+        self.client.force_login(self.admin)
+        self.client.get("/staff/team/")  # creates profiles for existing logins
+        rabi = StaffProfile.objects.get(user=self.rabi)
+        self.client.post(f"/staff/team/{rabi.pk}/", {"fullName": "Rabi Isa", "title": "Staff", "department": "Admissions",
+                                                    "access": "staff", "status": "Inactive", "action": "save"})
+        self.rabi.refresh_from_db()
+        self.assertFalse(self.rabi.is_active)
+        self.client.logout()
+        self.assertContains(self.client.post("/account/login/", {"email": "rabi@tsce.edu.ng", "password": PW}),
+                            "This account has been disabled")
+
+
+class AccountPasswordResetTests(StaffTestCase):
+    def test_admin_resets_an_applicants_password_from_the_application(self):
+        url = f"/staff/applications/{self.app.number}/"
+        self.assertNotContains(self.client.get(url), 'value="reset-password"')  # staff (non-admin) don't see it
+        self.assertEqual(self.client.post(url, {"action": "reset-password"}).status_code, 403)
+        self.client.force_login(self.admin)
+        res = self.client.post(url, {"action": "reset-password"})
+        self.assertContains(res, "Temporary password")
+        self.assertContains(res, f'href="{url}"')  # Done → back to the application
+        self.parent.refresh_from_db()
+        self.assertTrue(self.parent.must_change_password)
+        self.assertTrue(self.parent.check_password(res.context["password"]))

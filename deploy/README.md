@@ -1,11 +1,11 @@
 # Deploying the TSCE portal to a VPS
 
-One Ubuntu server runs everything: **nginx** serves the website files and HTTPS and passes `/api/` and `/admin/` to **Django** (gunicorn). Data lives in **SQLite**. Two **systemd timers** confirm missed payments every 5 minutes and take a backup every night.
+One Ubuntu server runs everything: **nginx** serves the static files (CSS, `js/site.js`, logos, `/static/`) and HTTPS, and passes the pages (`/`, `/pages/*.html`, `/account/`, `/apply/`, `/my-applications/`, `/pay/`, `/payments/`, `/staff/`, `/student/`), `/api/` and `/admin/` to **Django** (gunicorn). Data lives in **SQLite**. Two **systemd timers** confirm missed payments every 5 minutes and take a backup every night.
 
 ```
 Internet ──HTTPS──▶ nginx ─┬─ /            → /srv/tsce/frontend   (website + portals, plain files)
                            ├─ /static/     → /var/www/tsce/static (Django admin assets)
-                           └─ /api/ /admin → gunicorn (unix socket) → Django → /var/lib/tsce/db.sqlite3
+                           └─ pages, /api/, /admin → gunicorn (unix socket) → Django → /var/lib/tsce/db.sqlite3
 Zainpay ──webhook──▶ /api/payments/zainpay/webhook
 ```
 

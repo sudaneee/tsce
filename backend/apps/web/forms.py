@@ -11,7 +11,7 @@ from django.core.exceptions import ValidationError
 from apps.accounts.models import User
 from apps.admissions.discounts import today
 from apps.admissions.models import Application
-from apps.admissions.serializers import QUALIFICATIONS, STATES
+from apps.admissions.choices import QUALIFICATIONS, STATES
 from apps.core.validators import normalize_ng_phone, validate_document
 from apps.programmes.models import Programme
 

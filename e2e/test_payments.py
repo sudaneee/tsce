@@ -66,8 +66,8 @@ with sync_playwright() as p:
     check("receipt itemises programme + application fee", "50,000" in receipt and "Application fee" in receipt
           and "55,000" in receipt and "TSCE-ZP-" in receipt and "simulated payment" in receipt, receipt[:400])
     check("receipt: charge explained, not in total", "transaction charge" in receipt and "55,300" not in receipt)
-    me = page.evaluate("fetch('/api/auth/me').then(r => r.json()).then(r => r.user)")
-    check("self-applicant becomes a student", me["role"] == "student" and me["studentId"] == "TSCE/2026/00001")
+    page.goto(f"{B}/student/"); page.wait_for_selector(".sb-portal")
+    check("self-applicant becomes a student", "TSCE/2026/00001" in page.inner_text(".sb-portal"))
     page.goto(f"{B}/pay/{APP1}/"); page.wait_for_selector("#payRoot .empty")
     check("programme fee can't be paid twice", "already paid" in page.inner_text("#payRoot"))
     page.goto(f"{B}/pages/payment.html?app={APP1}&purpose=application_fee"); page.wait_for_selector("#payRoot .empty")
@@ -120,8 +120,8 @@ with sync_playwright() as p:
     check("balance paid → fully paid", "FULLY PAID" in page.inner_text(".success-card").upper())
     page.goto(f"{B}/student/"); page.click('.sb-link[href$="/results/"]'); page.wait_for_load_state("load")
     check("results released once fees are cleared", page.locator("#resultsWithheld").count() == 0 and "No results yet" in page.inner_text("#view"))
-    app3 = page.evaluate(f"fetch('/api/applications/' + encodeURIComponent('{APP3}')).then(r => r.json())")
-    check("fees cleared", app3["paymentStatus"] == "Paid" and app3["amountPaid"] == 55000 and app3["balance"] == 0, str(app3)[:200])
+    page.goto(f"{B}/pay/{APP3}/"); page.wait_for_selector("#payRoot .empty")
+    check("fees cleared", "already paid" in page.inner_text("#payRoot"))
     browser.close()
 
 for name, ok, detail in results:

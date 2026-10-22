@@ -24,7 +24,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "rest_framework",
     "apps.core",
     "apps.accounts",
     "apps.programmes",
@@ -114,23 +113,12 @@ PRIVATE_MEDIA_ROOT = Path(env("PRIVATE_MEDIA_ROOT", default=str(BASE_DIR / "priv
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 6 * 1024 * 1024
 
-# --- Django REST Framework ---
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ["apps.core.authentication.SessionAuth"],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
-    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
-    "DEFAULT_PARSER_CLASSES": [
-        "rest_framework.parsers.JSONParser",
-        "rest_framework.parsers.MultiPartParser",
-        "rest_framework.parsers.FormParser",
-    ],
-    "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
-    "DATETIME_FORMAT": "iso-8601",
-    "DEFAULT_THROTTLE_RATES": {"login": "10/min", "register": "10/hour", "verify_email": "20/hour", "apply": "30/hour", "public_form": "20/hour", "verify": "60/min", "payment": "30/min"},
-    # Number of reverse proxies in front of Django (nginx = 1 in production), so
-    # throttling uses the client's real IP from X-Forwarded-For.
-    "NUM_PROXIES": env.int("NUM_PROXIES", default=0),
-}
+# --- Rate limits for the forms (apps/web/throttle.py) ---
+THROTTLE_RATES = {"login": "10/min", "register": "10/hour", "verify_email": "20/hour", "apply": "30/hour",
+                  "public_form": "20/hour", "verify": "60/min", "payment": "30/min"}
+# Number of reverse proxies in front of Django (nginx = 1 in production), so rate
+# limits use the client's real IP from X-Forwarded-For.
+NUM_PROXIES = env.int("NUM_PROXIES", default=0)
 
 # File cache: shared by all gunicorn workers without running Redis/memcached.
 # Used for rate limiting (login attempts, public forms).

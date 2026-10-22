@@ -23,18 +23,18 @@ from django.utils import timezone
 
 from apps.academics.models import Student
 from apps.accounts import services as accounts
+from apps.accounts.services import temporary_password
 from apps.accounts.models import StaffProfile, User
-from apps.accounts.views import temporary_password
 from apps.admissions.models import Application, AwardRequest
 from apps.admissions.services import reject_application, review_award, send_reminder
-from apps.admissions.staff_views import filter_applications, sidebar_counts, staff_summary
+from apps.admissions.queries import filter_applications, sidebar_counts, staff_summary
 from apps.comms.models import Notification
 from apps.core.exceptions import ServiceError
 from apps.core.models import SiteSettings
 from apps.payments import services as payments
 from apps.payments.gateways import GatewayError
 from apps.payments.models import Payment
-from apps.payments.views import filter_payments, is_duplicate_row, payments_summary
+from apps.payments.queries import filter_payments, is_duplicate_row, payments_summary
 from apps.programmes.models import Cohort, Programme
 
 from .. import presenters
@@ -145,6 +145,11 @@ def application_detail(request, number):
     note_form = NoteForm(request.POST or None)
     if request.method == "POST" and note_form.is_valid():
         action, note = request.POST.get("action"), note_form.cleaned_data["note"]
+        if action == "reset-password":
+            if request.user.role != User.Role.ADMIN:
+                raise PermissionDenied
+            return _reset_account_password(request, app.user, active="applications",
+                                           done_url=reverse("web:staff-application", args=[app.number]))
         try:
             if action in ("award-yes", "award-no"):
                 app = review_award(app, action == "award-yes", request.user, note)
@@ -341,7 +346,12 @@ def team_member(request, pk=None):
 
 
 def _reset_password(request, profile):
-    user = profile.user
+    return _reset_account_password(request, profile.user, name=profile.full_name, active="team",
+                                   done_url=reverse("web:staff-team"))
+
+
+def _reset_account_password(request, user, name=None, active="team", done_url=""):
+    """Until self-service reset exists, an admin gives the user a temporary password to change at sign-in."""
     if user.role == User.Role.ADMIN and not request.user.is_superuser and user != request.user:
         raise PermissionDenied("Only a superuser can reset another administrator's password.")
     password = temporary_password()
@@ -351,7 +361,8 @@ def _reset_password(request, profile):
     if user == request.user:
         update_session_auth_hash(request, user)
     return render(request, "web/staff/temp_password.html", shell(
-        request, "team", "Staff", "Team directory", name=profile.full_name, email=user.email, password=password, reset=True))
+        request, active, "Temporary password", "Password reset", name=name or user.full_name, email=user.email,
+        password=password, reset=True, done_url=done_url))
 
 
 # ---------------------------------------------------------------------------

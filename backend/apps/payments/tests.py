@@ -8,13 +8,15 @@ from unittest import mock
 import requests
 from django.core.cache import cache
 from django.core.management import call_command
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from django.utils import timezone
-from rest_framework.test import APIClient
 
 from apps.academics.models import Enrollment, Student
 from apps.accounts.models import User
+from apps.admissions.discounts import first_installment
 from apps.admissions.models import Application, AwardRequest
+from apps.admissions.services import review_award, send_reminder
+from apps.core.exceptions import ServiceError
 from apps.comms.models import Notification
 from apps.core.models import SiteSettings
 from apps.programmes.models import Cohort, Programme
@@ -22,6 +24,7 @@ from apps.programmes.models import Cohort, Programme
 from . import services
 from .gateways import FAILED, PENDING, SUCCESS, GatewayError, VerifyResult, ZainpayGateway
 from .models import Payment, WebhookEvent
+from .views import SESSION_REF
 
 LOCMEM = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 ZP = {"ENVIRONMENT": "sandbox", "BASE_URL": "https://sandbox.zainpay.ng", "PUBLIC_KEY": "pk-test", "SECRET_KEY": "",
@@ -111,6 +114,16 @@ class ZainpayGatewayTests(TestCase):
 APP_FEE, PROG_FEE = "application_fee", "programme_fee"
 
 
+class Outcome:
+    """What starting a checkout gave: the fields a payer's page would use, or the refusal code."""
+
+    def __init__(self, status_code, data):
+        self.status_code, self._data = status_code, data
+
+    def json(self):
+        return self._data
+
+
 @override_settings(CACHES=LOCMEM, PAYMENT_GATEWAY="simulator", ZAINPAY=ZP,
                    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
 class PaymentFlowTestCase(TestCase):
@@ -120,7 +133,7 @@ class PaymentFlowTestCase(TestCase):
 
     def setUp(self):
         cache.clear()
-        self.client = APIClient(enforce_csrf_checks=True)
+        self.client = Client()
         self.staff = User.objects.create_user("rabi@tsce.edu.ng", "x-Pass-2026!", full_name="Rabi", role="staff")
         self.user = self.account("aisha@example.com", "Aisha Garba")
         self.app = self.make_app(self.user)
@@ -139,21 +152,27 @@ class PaymentFlowTestCase(TestCase):
         fields.update(extra)
         return Application.objects.create(**fields)
 
-    def csrf(self):
-        return {"HTTP_X_CSRFTOKEN": self.client.get("/api/auth/csrf").json()["csrfToken"]}
-
     def initialize(self, purpose=APP_FEE, number="TSCE/APP/2026/00001", plan="full"):
+        """Starts a checkout like the pay page does → Started(ref, checkoutUrl, amount, installment) or Refused(code)."""
+        app = Application.objects.get(number=number)
         with on(OCT_1):
-            return self.client.post("/api/payments/initialize", {"applicationId": number, "purpose": purpose, "plan": plan},
-                                    format="json", **self.csrf())
+            try:
+                payment = services.start_checkout(app, purpose, "http://testserver/api/payments/zainpay/callback", plan)
+            except ServiceError as exc:
+                return Outcome(exc.status_code, {"code": exc.code})
+        session = self.client.session
+        session[SESSION_REF] = payment.reference
+        session.save()
+        return Outcome(200, {"ref": payment.reference, "checkoutUrl": payment.checkout_url, "amount": payment.amount,
+                             "installment": payment.installment})
 
     def checkout(self, outcome, purpose=APP_FEE, number="TSCE/APP/2026/00001", plan="full"):
         """Initialize → simulated checkout page → callback; returns (final redirect, ref)."""
         res = self.initialize(purpose, number, plan)
-        self.assertEqual(res.status_code, 200, res.content)
+        self.assertEqual(res.status_code, 200, res.json())
         url = res.json()["checkoutUrl"]
         self.assertEqual(self.client.get(url).status_code, 200)
-        back = self.client.post(url, {"outcome": outcome}, **self.csrf())
+        back = self.client.post(url, {"outcome": outcome})
         self.assertIn("/api/payments/zainpay/callback?txnRef=", back["Location"])
         with on(OCT_1):
             return self.client.get(back["Location"]), res.json()["ref"]
@@ -182,10 +201,9 @@ class SinglePaymentFlowTests(PaymentFlowTestCase):
         self.assertEqual(self.user.role, "student")
         student = Student.objects.get(user=self.user)
         self.assertEqual(Enrollment.objects.get().amount_paid, 55000)
-        detail = self.client.get(f"/api/payments/{ref}").json()
-        self.assertEqual((detail["purpose"], detail["studentId"]), (PROG_FEE, student.student_no))
+        self.assertEqual((pay.purpose, pay.application.enrollment.student), (PROG_FEE, student))
         # later confirmations are no-ops
-        self.client.post(f"/api/payments/{ref}/check", **self.csrf())
+        services.process_payment(Payment.objects.get(reference=ref))
         call_command("reconcile_payments", stdout=StringIO())
         self.assertEqual(Enrollment.objects.count(), 1)
 
@@ -197,20 +215,16 @@ class SinglePaymentFlowTests(PaymentFlowTestCase):
         Application.objects.filter(pk=self.app.pk).update(application_fee_paid_at=timezone.now())
         res = self.initialize(PROG_FEE)
         self.assertEqual(res.json()["amount"], 50000)  # the ₦5,000 they already paid is not charged again
-        detail = self.client.get(f"/api/applications/{self.app.number}").json()
-        self.assertEqual((detail["amountPayable"], detail["applicationFeeDue"]), (50000, 0))
+        app = self.refresh()
+        self.assertEqual((app.amount_payable, app.amount_payable - (app.fee - app.discount_amount)), (50000, 0))
 
     def test_excellence_award_discounts_tuition_only(self):
         Application.objects.filter(pk=self.app.pk).update(status="Awaiting Verification")
         AwardRequest.objects.create(application=self.app, type="excellence", requested_pct=50, evidence="WAEC 2022 — 6 A's")
         self.assertEqual(self.initialize(PROG_FEE).json()["code"], "not_admitted")
-        url = f"/api/staff/applications/{self.app.number}/award"
-        self.assertEqual(self.client.post(url, {"approve": True}, format="json", **self.csrf()).status_code, 403)
-        self.client.force_login(self.staff)
-        res = self.client.post(url, {"approve": True, "note": "Original WAEC seen"}, format="json", **self.csrf())
-        self.assertEqual((res.json()["status"], res.json()["amountPayable"], res.json()["applicationFeeDue"]),
+        app = review_award(self.app, True, self.staff, "Original WAEC seen")
+        self.assertEqual((app.status, app.amount_payable, app.amount_payable - (app.fee - app.discount_amount)),
                          ("Admitted", 30000, 5000))  # ₦25,000 tuition + ₦5,000 application fee
-        self.client.force_login(self.user)
         _, ref = self.checkout("success", PROG_FEE)
         self.assertEqual(Payment.objects.get(reference=ref).amount, 30000)
         self.assertEqual(self.refresh().status, "Enrolled")
@@ -218,9 +232,8 @@ class SinglePaymentFlowTests(PaymentFlowTestCase):
     def test_declined_award_pays_full_price(self):
         Application.objects.filter(pk=self.app.pk).update(status="Awaiting Verification")
         AwardRequest.objects.create(application=self.app, type="excellence", requested_pct=50)
-        self.client.force_login(self.staff)
-        res = self.client.post(f"/api/staff/applications/{self.app.number}/award", {"approve": False}, format="json", **self.csrf())
-        self.assertEqual((res.json()["status"], res.json()["amountPayable"]), ("Admitted", 55000))
+        app = review_award(self.app, False, self.staff)
+        self.assertEqual((app.status, app.amount_payable), ("Admitted", 55000))
 
     def test_early_bird_discounts_tuition_only(self):
         Cohort.objects.update(enrolment_opens=date(2026, 9, 1), early_bird_deadline=date(2026, 10, 5))
@@ -256,10 +269,10 @@ class SinglePaymentFlowTests(PaymentFlowTestCase):
     def test_callback_without_txnref_uses_only_this_browsers_session(self):
         res = self.initialize(PROG_FEE)
         ref = res.json()["ref"]
-        self.client.post(res.json()["checkoutUrl"], {"outcome": "success"}, **self.csrf())
+        self.client.post(res.json()["checkoutUrl"], {"outcome": "success"})
         with on(OCT_1):
             self.assertEqual(self.client.get("/api/payments/zainpay/callback")["Location"], f"/payments/{ref}/")
-        self.assertEqual(APIClient().get("/api/payments/zainpay/callback")["Location"], "/my-applications/?payment=unknown")
+        self.assertEqual(Client().get("/api/payments/zainpay/callback")["Location"], "/my-applications/?payment=unknown")
 
     def test_seats_are_taken_by_payment_only(self):
         Programme.objects.filter(slug="fullstack").update(capacity=1)
@@ -273,17 +286,13 @@ class SinglePaymentFlowTests(PaymentFlowTestCase):
     def test_refusals(self):
         Application.objects.filter(pk=self.app.pk).update(status="Rejected")
         self.assertEqual(self.initialize(PROG_FEE).json()["code"], "application_rejected")
-        other = self.account("c@example.com", "C")
-        self.make_app(other, number="TSCE/APP/2026/00003", status="Admitted")
-        self.assertEqual(self.initialize(PROG_FEE, "TSCE/APP/2026/00003").status_code, 404)  # not yours
-        anon = APIClient()
-        self.assertEqual(anon.post("/api/payments/initialize", {"applicationId": self.app.number}).status_code, 401)
+        # (who may open which invoice is covered by the page tests in apps/web)
 
     def test_double_payment_is_flagged_not_double_enrolled(self):
         first = self.initialize(PROG_FEE).json()
         second = self.initialize(PROG_FEE).json()
         for p in (first, second):
-            self.client.post(p["checkoutUrl"], {"outcome": "success"}, **self.csrf())
+            self.client.post(p["checkoutUrl"], {"outcome": "success"})
             with on(OCT_1):
                 self.client.get(f"/api/payments/zainpay/callback?txnRef={p['ref']}")
         self.assertEqual(Payment.objects.filter(status="SUCCESS").count(), 2)
@@ -314,8 +323,7 @@ class InstallmentTests(PaymentFlowTestCase):
 
         from apps.academics.models import Certificate
 
-        detail = self.client.get(f"/api/applications/{self.app.number}").json()
-        self.assertEqual(detail["firstInstallment"], 30000)  # ₦25,000 + the ₦5,000 application fee
+        self.assertEqual(first_installment(self.refresh()), 30000)  # ₦25,000 + the ₦5,000 application fee
         _, ref = self.checkout("success", PROG_FEE, plan="half")
         pay = Payment.objects.get(reference=ref)
         self.assertEqual((pay.amount, pay.installment), (30000, Payment.Installment.FIRST))
@@ -348,7 +356,7 @@ class InstallmentTests(PaymentFlowTestCase):
         ok = resp(200, {"code": "00", "data": "https://checkout.zainpay.ng/x"})
         with override_settings(PAYMENT_GATEWAY="zainpay", ZAINPAY={**ZP, "PAYER_CHARGE": 300}),                 mock.patch("apps.payments.gateways.requests.post", return_value=ok) as post:
             res = self.initialize(PROG_FEE, plan="half")
-            self.assertEqual(res.status_code, 200, res.content)
+            self.assertEqual(res.status_code, 200, res.json())
             self.assertEqual(post.call_args.kwargs["json"]["amount"], "30300")  # ₦30,000 + ₦300, not ₦55,300
             self.initialize(PROG_FEE)
             self.assertEqual(post.call_args.kwargs["json"]["amount"], "55300")
@@ -363,9 +371,7 @@ class InstallmentTests(PaymentFlowTestCase):
     def test_excellence_award_half(self):
         Application.objects.filter(pk=self.app.pk).update(status="Awaiting Verification")
         AwardRequest.objects.create(application=self.app, type="excellence", requested_pct=50)
-        self.client.force_login(self.staff)
-        self.client.post(f"/api/staff/applications/{self.app.number}/award", {"approve": True}, format="json", **self.csrf())
-        self.client.force_login(self.user)
+        review_award(self.app, True, self.staff)
         self.assertEqual(self.initialize(PROG_FEE, plan="half").json()["amount"], 17500)  # 12,500 + 5,000
 
     def test_installments_can_be_switched_off(self):
@@ -383,7 +389,7 @@ class InstallmentTests(PaymentFlowTestCase):
         half = self.initialize(PROG_FEE, plan="half").json()
         full = self.initialize(PROG_FEE).json()
         for p in (half, full):
-            self.client.post(p["checkoutUrl"], {"outcome": "success"}, **self.csrf())
+            self.client.post(p["checkoutUrl"], {"outcome": "success"})
             with on(OCT_1):
                 self.client.get(f"/api/payments/zainpay/callback?txnRef={p['ref']}")
         app = self.refresh()
@@ -396,7 +402,7 @@ class InstallmentTests(PaymentFlowTestCase):
         self.checkout("success", PROG_FEE, plan="half")
         a, b = self.initialize(PROG_FEE).json(), self.initialize(PROG_FEE).json()
         for p in (a, b):
-            self.client.post(p["checkoutUrl"], {"outcome": "success"}, **self.csrf())
+            self.client.post(p["checkoutUrl"], {"outcome": "success"})
             with on(OCT_1):
                 self.client.get(f"/api/payments/zainpay/callback?txnRef={p['ref']}")
         self.assertEqual(self.refresh().amount_paid, 55000)
@@ -404,9 +410,7 @@ class InstallmentTests(PaymentFlowTestCase):
 
     def test_staff_reminder_for_the_balance(self):
         self.checkout("success", PROG_FEE, plan="half")
-        self.client.force_login(self.staff)
-        res = self.client.post(f"/api/staff/applications/{self.app.number}/remind", **self.csrf())
-        self.assertEqual(res.json()["reminded"], "programme fee balance")
+        self.assertEqual(send_reminder(self.refresh(), self.staff), "programme fee balance")
 
 
 class LegacyApplicationFeeTests(PaymentFlowTestCase):
@@ -436,8 +440,8 @@ class WebhookTests(PaymentFlowTestCase):
     def post_webhook(self, body, secret="whsec-test"):
         raw = json.dumps(body).encode()
         sig = hmac.new(secret.encode(), raw, hashlib.sha256).hexdigest()
-        return APIClient().post("/api/payments/zainpay/webhook", raw, content_type="application/json",
-                                HTTP_ZAINPAY_SIGNATURE=sig)
+        return Client().post("/api/payments/zainpay/webhook", raw, content_type="application/json",
+                             HTTP_ZAINPAY_SIGNATURE=sig)
 
     def pending_zainpay_payment(self):
         return Payment.objects.create(reference="TSCE-ZP-20261001-000099", purpose=APP_FEE, application=self.app,
@@ -497,7 +501,7 @@ class WebhookTests(PaymentFlowTestCase):
         self.assertTrue(Notification.objects.filter(recipient=self.staff, title="Underpayment — follow up").exists())
         # A later "success" for the same short transfer still doesn't give value
         call_command("reconcile_payments", stdout=StringIO())
-        self.client.post(f"/api/payments/{payment.reference}/check", **self.csrf())
+        services.process_payment(payment)
         payment.refresh_from_db()
         self.assertEqual(payment.status, "FAILED")
 

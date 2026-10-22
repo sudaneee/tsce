@@ -1,4 +1,7 @@
-"""Account registration and email verification."""
+"""Account registration, email verification and staff accounts."""
+import secrets
+import string
+
 from django.conf import settings
 from django.core import signing
 from django.db import transaction
@@ -59,6 +62,12 @@ def register(account_type: str, full_name: str, email: str, phone: str, password
     return user
 
 
+def temporary_password(length=10):
+    # No look-alike characters (0/O, 1/l/I) — it's read out or typed from a screen.
+    alphabet = "".join(c for c in string.ascii_letters + string.digits if c not in "0O1lI")
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
 class InvalidToken(Exception):
     pass
 
@@ -110,8 +119,6 @@ def ensure_staff_profiles():
 
 def _grant_login(profile, access: str):
     """Creates or re-activates the portal login. Returns a temporary password when one was set."""
-    from .views import temporary_password
-
     role = User.Role.ADMIN if access == ACCESS_ADMIN else User.Role.STAFF
     user = profile.user
     if user is None:

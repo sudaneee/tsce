@@ -30,7 +30,11 @@
     <div class="panel"><div class="panel-head"><h3><i class="fa-solid fa-user-shield"></i>{% if app.user.role == "parent" %}Parent / guardian account{% else %}Account{% endif %}</h3></div><div class="panel-body"><div class="kv">
         <div><small>Name</small><strong>{{ app.user.full_name }}</strong></div><div><small>Email</small><strong><a href="mailto:{{ app.user.email }}">{{ app.user.email }}</a></strong></div>
         <div><small>Phone</small><strong>{{ app.user.phone|default:"—" }}</strong></div><div><small>Type</small><strong>{% if app.user.role == "parent" %}Parent{% else %}Self-applicant{% endif %}</strong></div>
-    </div></div></div>
+    </div>
+    {% if is_admin %}<form method="post" class="flex between flex-wrap mt-2" style="align-items:center">{% csrf_token %}
+        <p class="small muted mb-0">Forgotten password? Give the account holder a temporary one; they choose their own at next sign-in.</p>
+        <button class="btn btn-ghost btn-sm" name="action" value="reset-password" id="resetAccountPw"><i class="fa-solid fa-key"></i> Reset account password</button></form>{% endif %}
+    </div></div>
 
     <div class="panel"><div class="panel-head"><h3><i class="fa-solid fa-graduation-cap"></i>Education</h3></div><div class="panel-body"><div class="kv">
         <div><small>Qualification</small><strong>{{ app.qualification }}</strong></div><div><small>Graduation year</small><strong>{{ app.grad_year|default:"—" }}</strong></div>

@@ -114,7 +114,7 @@ with sync_playwright() as p:
     check("two children listed", cards.count() == 2)
     text = page.inner_text("#maRoot")
     check("child 1 enrolled, child 2 awaiting verification", "Enrolled" in text and "Awaiting Verification" in text)
-    umar_no = page.evaluate("fetch('/api/applications').then(r => r.json()).then(a => a.find(x => x.firstName === 'Umar').id)")
+    umar_no = page.locator("#maRoot article", has_text="Umar").get_attribute("id")
     page.goto(f"{B}/pay/{umar_no}/"); page.wait_for_selector("#payRoot .empty")
     check("programme fee blocked until verified", "verification pending" in page.inner_text("#payRoot"))
 
@@ -135,8 +135,8 @@ with sync_playwright() as p:
     pay(page)
     page.wait_for_selector(".success-card")
     check("child 2 enrolled", "ENROLMENT CONFIRMED" in page.inner_text(".success-card").upper())
-    me = page.evaluate("fetch('/api/auth/me').then(r => r.json()).then(r => r.user)")
-    check("account stays a parent account", me["role"] == "parent")
+    page.goto(f"{B}/my-applications/"); page.wait_for_selector("#maSub")
+    check("account stays a parent account", "parent / guardian" in page.inner_text("#maSub"))
     browser.close()
 
 for name, ok, detail in results:

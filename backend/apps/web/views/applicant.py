@@ -185,7 +185,8 @@ def legacy_staff(request, page):
     if page == "payments" and q.get("ref"):
         return redirect(reverse("web:staff-payment", kwargs={"ref": q["ref"]}))
     target = {"dashboard": "web:staff-dashboard", "applications": "web:staff-applications", "scholarships": "web:staff-awards",
-              "payments": "web:staff-payments", "staff": "web:staff-team", "settings": "web:staff-settings"}[page]
+              "payments": "web:staff-payments", "staff": "web:staff-team", "settings": "web:staff-settings"
+              }.get(page, "web:staff-dashboard")  # the old "coming soon" pages → the dashboard
     keep = {k: q[k] for k in ("status",) if q.get(k)}
     return redirect(reverse(target) + (f"?{urlencode(keep)}" if keep else ""))
 

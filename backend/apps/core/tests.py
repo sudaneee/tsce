@@ -1,39 +1,32 @@
-from django.test import TestCase
-from rest_framework.test import APIClient
+from io import StringIO
+
+from django.core.management import call_command
+from django.test import Client, TestCase
 
 from apps.accounts.models import User
 
 
-class ApiFoundationTests(TestCase):
-    def setUp(self):
-        self.client = APIClient(enforce_csrf_checks=True)
-
+class FoundationTests(TestCase):
     def test_health(self):
         res = self.client.get("/api/health")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json()["status"], "ok")
 
-    def test_unknown_api_path_returns_json_error_shape(self):
+    def test_only_zainpay_and_health_remain_under_api(self):
         res = self.client.get("/api/does-not-exist")
-        self.assertEqual(res.status_code, 404)
-        self.assertEqual(res.json(), {"error": "Not found.", "code": "not_found", "fields": {}})
+        self.assertEqual((res.status_code, res.json()["code"]), (404, "not_found"))
+        for gone in ("/api/site", "/api/auth/me", "/api/applications", "/api/staff/summary", "/api/payments/initialize"):
+            self.assertEqual(self.client.get(gone).status_code, 404, gone)
 
-    def test_csrf_endpoint_sets_cookie(self):
-        res = self.client.get("/api/auth/csrf")
-        self.assertEqual(res.status_code, 200)
-        self.assertIn("csrftoken", res.cookies)
-
-    def test_authenticated_unsafe_request_requires_csrf_token(self):
+    def test_forms_require_a_csrf_token(self):
+        call_command("seed_school", stdout=StringIO())
         User.objects.create_user("staff@tsce.edu.ng", "s3cure-pass!", full_name="Staff", role=User.Role.STAFF)
-        self.client.login(email="staff@tsce.edu.ng", password="s3cure-pass!")
-
-        res = self.client.post("/api/does-not-exist", {}, format="json")
-        self.assertEqual(res.status_code, 403)
-        self.assertIn("CSRF", res.json()["error"])
-
-        token = self.client.get("/api/auth/csrf").json()["csrfToken"]
-        res = self.client.post("/api/does-not-exist", {}, format="json", HTTP_X_CSRFTOKEN=token)
-        self.assertEqual(res.status_code, 404)
+        strict = Client(enforce_csrf_checks=True)
+        strict.login(email="staff@tsce.edu.ng", password="s3cure-pass!")
+        self.assertEqual(strict.post("/staff/notifications/", {}).status_code, 403)
+        page = strict.get("/staff/notifications/")
+        token = page.cookies["csrftoken"].value
+        self.assertEqual(strict.post("/staff/notifications/", {"csrfmiddlewaretoken": token}).status_code, 302)
 
 
 class UserModelTests(TestCase):

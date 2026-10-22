@@ -34,10 +34,8 @@ def applicant_required(view):
 
 
 def error_text(exc) -> str:
-    """Message of a ServiceError (a DRF APIException)."""
-    return str(exc.detail)
+    return exc.message
 
 
 def error_code(exc) -> str:
-    codes = exc.get_codes()
-    return codes if isinstance(codes, str) else "invalid"
+    return exc.code

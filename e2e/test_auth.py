@@ -81,9 +81,9 @@ with sync_playwright() as p:
     login(page, "director@tsce.edu.ng", "Director-Pass-2026")
     page.wait_for_url("**/staff/")
     check("admin sees Settings in menu", page.locator('.menu-list a[href="/staff/settings/"]').count() == 1)
-    temp = page.evaluate("""fetch('/api/staff/users/3/reset-password', {method: 'POST', headers: {'X-CSRFToken':
-        document.cookie.split('; ').find(c => c.startsWith('csrftoken=')).split('=')[1]}}).then(r => r.json()).then(r => r.temporaryPassword)""")
-    check("admin got a temporary password", temp and len(temp) == 10)
+    page.goto(f"{B}/staff/applications/TSCE/APP/2026/00001/"); page.click("#resetAccountPw"); page.wait_for_selector("#tempPassword")
+    temp = page.inner_text("#tempPassword").strip()
+    check("admin got a temporary password from the application page", len(temp) == 10)
     page.click("#userBtn"); page.click("#umLogout"); page.wait_for_url("**/account/login/?out=1")
     login(page, "amina@example.com", temp)
     page.wait_for_url("**/account/password/"); page.wait_for_selector("#id_old_password")
@@ -92,8 +92,8 @@ with sync_playwright() as p:
     check("can't skip the password change", "/account/password/" in page.url)
     page.fill("#id_old_password", temp); page.fill("#id_new_password1", "Student-Pass-2027"); page.fill("#id_new_password2", "Student-Pass-2027")
     page.click("main button[type=submit]"); page.wait_for_url("**/my-applications/")
-    me = page.evaluate("fetch('/api/auth/me').then(r => r.json()).then(r => r.user)")
-    check("mustChangePassword cleared", me["mustChangePassword"] is False and me["role"] == "student")
+    page.goto(f"{B}/my-applications/"); page.wait_for_selector("#maRoot")
+    check("password change no longer required", page.url.endswith("/my-applications/"))
 
     # 9. Remember-me off → browser-session cookie
     page.click("#maLogout"); page.wait_for_url("**/account/login/?out=1")

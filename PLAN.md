@@ -39,6 +39,7 @@ Register (Student account for yourself, or Parent account for your children)
 ## Architecture
 
 ```
+(Superseded on 16–22 Oct 2026 by server-rendered pages — see "Server-rendered pages" below and README.md.)
 Browser (existing HTML/CSS/JS)  ──fetch──▶  Django + DRF (/api/...)  ──▶  SQLite (WAL)
      same origin · session cookie + CSRF                                  media/ (WAEC uploads)
                                             /api/webhooks/zainpay  ◀──  Zainpay
@@ -227,7 +228,10 @@ Old `pages/*.html` addresses of converted pages redirect to the new ones.
   results (withheld until fees are cleared), certificate (requirements / issued + verify link), payments & receipts,
   announcements, support tickets (staff answer at `/staff/support/`), profile. Parents open each child's portal;
   rules live in `academics/services.py`. Data entry for attendance/results/certificates is Phase 8.
-- **Step 5 — clean-up**: delete the demo engine (`data.js`, `storage.js`, demo code in the JS files) and the API
+- **Step 5 — clean-up** ✔ (22 Oct 2026): the demo engine and every JS page module are gone (only `js/site.js`
+  remains); the JSON API and Django REST Framework are removed — `/api/` now holds only `/api/health` and Zainpay's
+  callback/webhook/simulator. Admins reset any account's password from the application page.
+- (old wording) delete the demo engine (`data.js`, `storage.js`, demo code in the JS files) and the API
   endpoints no page uses any more (the Zainpay webhook/callback stay).
 
 **Phase 7 — Student portal**: dashboard, profile, programme (simplified Learning), attendance, results, payments, certificate, announcements, support, settings.

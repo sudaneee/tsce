@@ -11,6 +11,7 @@
     <div class="option-grid mb-3" role="radiogroup" aria-label="Account type">
         {% for r in form.accountType %}<label class="option-card">{{ r.tag }}<span class="oc-radio"></span><span><strong>{{ r.choice_label }}</strong><small>{% if r.data.value == "parent" %}Parent or guardian — apply for one or more children{% else %}I'm applying for my own training{% endif %}</small></span></label>{% endfor %}
     </div>
+    {% for e in form.accountType.errors %}<p class="field-error mb-2" style="display:block">{{ e }}</p>{% endfor %}
     {% include "web/partials/field.html" with f=form.fullName req=1 cls="mb-2" %}
     {% include "web/partials/field.html" with f=form.email req=1 cls="mb-2" hint="We'll send a verification link here." %}
     {% include "web/partials/field.html" with f=form.phone req=1 cls="mb-2" %}

@@ -112,8 +112,11 @@ with sync_playwright() as p:
     check("settings: payments read-only info", "₦300" in page.inner_text("#pay") and "Bank transfer" in page.inner_text("#pay"))
     page.fill("#id_admissions-opens", "2026-09-01"); page.fill("#id_admissions-applicationFee", "6000")
     page.click("#admissions button.btn-primary"); page.wait_for_selector(".toast-msg")
-    site = page.evaluate("fetch('/api/site').then(r => r.json()).then(r => r.settings.admissions)")
-    check("settings: application fee + opening date saved", site["applicationFee"] == 6000 and site["opens"] == "2026-09-01")
+    page.goto(f"{B}/staff/settings/")
+    check("settings: application fee + opening date saved",
+          page.input_value("#id_admissions-applicationFee") == "6000" and page.input_value("#id_admissions-opens") == "2026-09-01")
+    page.goto(f"{B}/pages/admissions.html")
+    check("settings: new application fee shown on the public site", "₦6,000 application fee" in page.inner_text("main"))
     ctx.close()
 
     # The new bursar signs in with the temporary password and must change it

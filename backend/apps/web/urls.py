@@ -65,6 +65,6 @@ urlpatterns = [
     re_path(r"^pages/(?P<page>login|register|verify-email|application|my-applications|payment|success)\.html$",
             applicant.legacy, name="legacy"),
     re_path(r"^pages/student/[a-z]+\.html$", applicant.legacy_student, name="legacy-student"),
-    re_path(r"^pages/staff/(?P<page>dashboard|applications|scholarships|payments|staff|settings)\.html$",
+    re_path(r"^pages/staff/(?P<page>[a-z]+)\.html$",
             applicant.legacy_staff, name="legacy-staff"),
 ]

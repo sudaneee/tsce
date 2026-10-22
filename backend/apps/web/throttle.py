@@ -1,6 +1,5 @@
 """
-Rate limits for the server-rendered forms, sharing the scopes and rates of the
-API (REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]) and its cache.
+Rate limits for the forms (settings.THROTTLE_RATES), counted in the shared cache.
 """
 import time
 
@@ -11,7 +10,7 @@ PERIODS = {"s": 1, "sec": 1, "m": 60, "min": 60, "h": 3600, "hour": 3600, "d": 8
 
 
 def client_ip(request) -> str:
-    proxies = settings.REST_FRAMEWORK.get("NUM_PROXIES") or 0
+    proxies = settings.NUM_PROXIES
     xff = request.META.get("HTTP_X_FORWARDED_FOR")
     if proxies and xff:
         hops = [a.strip() for a in xff.split(",")]
@@ -21,7 +20,7 @@ def client_ip(request) -> str:
 
 def allow(request, scope: str) -> bool:
     """Counts this request against `scope`; False once the limit is reached."""
-    rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].get(scope)
+    rate = settings.THROTTLE_RATES.get(scope)
     if not rate:
         return True
     count, period = rate.split("/")
